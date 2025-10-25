@@ -362,6 +362,17 @@ with DAG(
 
     model_automl_completed = DummyOperator(task_id="model_automl_completed")
 
+    # Ensure the first six months of predictions exist once models are trained
+    seed_inference_backfill = BashOperator(
+        task_id='seed_inference_backfill',
+        bash_command=(
+            'cd /opt/airflow/scripts && '
+            'python3 seed_inference_backfill.py '
+            '--snapshotdate "{{ ds }}" '
+            '--backfill-months 6'
+        ),
+    )
+
     # Define task dependencies to run scripts sequentially
     # Only run model training if we have sufficient data (>= 2024-06-01)
     feature_store_completed >> check_training_data
@@ -369,3 +380,4 @@ with DAG(
     check_training_data >> model_automl_start
     model_automl_start >> model_1_automl >> model_automl_completed
     model_automl_start >> model_2_automl >> model_automl_completed
+    model_automl_completed >> seed_inference_backfill
