@@ -18,7 +18,6 @@ from pathlib import Path
 
 from dateutil.relativedelta import relativedelta
 
-
 SCRIPT_DIR = Path(__file__).resolve().parent
 PREDICTIONS_DIR = SCRIPT_DIR / "datamart" / "gold" / "predictions"
 
@@ -46,7 +45,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--backfill-months",
         type=int,
-        default=6,
+        default=7,
         help="Number of consecutive months (including snapshot date) to ensure predictions exist.",
     )
     parser.add_argument(
@@ -93,7 +92,9 @@ def ensure_predictions(model_key: str, run_date: datetime):
         run_date.strftime("%Y-%m-%d"),
     ]
 
-    print(f"[RUN ] {model_key}: generating predictions for {run_date.strftime('%Y-%m-%d')}")
+    print(
+        f"[RUN ] {model_key}: generating predictions for {run_date.strftime('%Y-%m-%d')}"
+    )
     subprocess.run(cmd, cwd=SCRIPT_DIR, check=True)
     print(f"[DONE] {model_key}: created {output_path}")
 

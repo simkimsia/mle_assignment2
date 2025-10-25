@@ -38,11 +38,28 @@ print_error() {
 cleanup_monitoring() {
     print_header "Cleaning: Model Monitoring Outputs"
 
+    # Clean monitoring metrics
     if [ -d "$SCRIPT_DIR/datamart/gold/monitoring" ]; then
         rm -rf "$SCRIPT_DIR/datamart/gold/monitoring"/*
         print_info "Removed monitoring metrics"
     else
         print_warning "Monitoring directory doesn't exist yet"
+    fi
+
+    # Clean visualization outputs
+    if [ -d "${SCRIPT_DIR}/outputs/visuals" ]; then
+        rm -rf "${SCRIPT_DIR}/outputs/visuals"/*
+        print_info "Removed monitoring visualizations"
+    else
+        print_warning "Visualization directory doesn't exist yet"
+    fi
+
+    # Clean action evaluation outputs
+    if [ -d "${SCRIPT_DIR}/outputs/actions" ]; then
+        rm -rf "${SCRIPT_DIR}/outputs/actions"/*
+        print_info "Removed action evaluation reports"
+    else
+        print_warning "Action evaluation directory doesn't exist yet"
     fi
 }
 

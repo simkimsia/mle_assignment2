@@ -1,0 +1,231 @@
+{
+  "description": "Monitoring thresholds for model performance evaluation and action determination",
+  "version": "1.0",
+  "last_updated": "2025-10-25",
+
+  "action_levels": {
+    "monitor": {
+      "description": "Default state - all metrics above data science thresholds",
+      "action_required": "Continue normal monitoring cycle",
+      "notification": "Monthly monitoring report (informational)"
+    },
+    "active_monitoring": {
+      "description": "P0 or P1 metric below data science threshold but above business threshold",
+      "action_required": "Increase monitoring frequency, investigate root cause, prepare for potential retraining",
+      "notification": "Slack alert to #ml-monitoring + email to ML team"
+    },
+    "retrain": {
+      "description": "P0 or P1 metric below business threshold - critical degradation",
+      "action_required": "Immediate model retraining required within 1 week",
+      "notification": "PagerDuty alert + Slack alert + email to ML team + Risk team"
+    }
+  },
+
+  "metrics": {
+    "roc_auc": {
+      "priority": "P0",
+      "name": "ROC-AUC",
+      "description": "Model discrimination capability - primary metric for model selection",
+      "owner": "Business + Data Science",
+      "business_threshold": 0.75,
+      "data_science_threshold": 0.80,
+      "threshold_rationale": {
+        "business": "Below 0.75 ROC-AUC, model discrimination is insufficient for credit risk decisions",
+        "data_science": "Target 0.80+ to maintain quality buffer above business minimum"
+      },
+      "baseline_comparison": {
+        "enabled": true,
+        "reference": "oot_roc_auc",
+        "max_degradation_percent": 5.0,
+        "description": "Alert if production ROC-AUC drops >5% from OOT baseline"
+      }
+    },
+
+    "accuracy": {
+      "priority": "P1",
+      "name": "Accuracy",
+      "description": "Overall prediction correctness",
+      "owner": "Business + Data Science",
+      "business_threshold": 0.70,
+      "data_science_threshold": 0.75,
+      "threshold_rationale": {
+        "business": "Below 70% accuracy, too many incorrect predictions for business use",
+        "data_science": "Target 75%+ to maintain quality margin"
+      },
+      "baseline_comparison": {
+        "enabled": true,
+        "reference": "oot_accuracy",
+        "max_degradation_percent": 5.0,
+        "description": "Alert if production accuracy drops >5% from OOT baseline"
+      }
+    },
+
+    "f1_score": {
+      "priority": "P2",
+      "name": "F1-Score",
+      "description": "Harmonic mean of precision and recall - balance between false positives and false negatives",
+      "owner": "Data Science",
+      "business_threshold": null,
+      "data_science_threshold": 0.60,
+      "threshold_rationale": {
+        "business": "Not directly monitored by business stakeholders",
+        "data_science": "Below 0.60 indicates poor precision-recall balance, investigate model calibration"
+      },
+      "baseline_comparison": {
+        "enabled": false,
+        "reference": null,
+        "max_degradation_percent": null,
+        "description": "F1-Score not available during training, only in production monitoring"
+      }
+    },
+
+    "precision": {
+      "priority": "P3",
+      "name": "Precision",
+      "description": "Of predicted defaults, percentage that are correct - controls false positives",
+      "owner": "Data Science",
+      "business_threshold": null,
+      "data_science_threshold": 0.60,
+      "threshold_rationale": {
+        "business": "Not directly monitored by business stakeholders",
+        "data_science": "Below 0.60 means too many false positives, wasting collection resources"
+      },
+      "baseline_comparison": {
+        "enabled": false
+      }
+    },
+
+    "recall": {
+      "priority": "P3",
+      "name": "Recall",
+      "description": "Of actual defaults, percentage caught by model - controls false negatives",
+      "owner": "Data Science",
+      "business_threshold": null,
+      "data_science_threshold": 0.65,
+      "threshold_rationale": {
+        "business": "Not directly monitored by business stakeholders",
+        "data_science": "Below 0.65 means missing too many defaults, increasing credit losses"
+      },
+      "baseline_comparison": {
+        "enabled": false
+      }
+    }
+  },
+
+  "stability_metrics": {
+    "description": "Prediction distribution stability - detects data drift",
+    "mean_prediction_proba_drift": {
+      "name": "Mean Prediction Probability Drift",
+      "description": "Absolute change in mean prediction probability from baseline",
+      "threshold": 0.15,
+      "threshold_rationale": ">15% drift indicates population shift or model drift",
+      "action": "Investigate data drift, consider retraining"
+    },
+    "std_prediction_proba_drift": {
+      "name": "Prediction Std Dev Drift",
+      "description": "Absolute change in prediction std deviation from baseline",
+      "threshold": 0.20,
+      "threshold_rationale": ">20% change indicates prediction confidence shift",
+      "action": "Review feature distributions, check data quality"
+    }
+  },
+
+  "action_determination_logic": {
+    "description": "Rules for determining required action based on metric thresholds",
+    "rules": [
+      {
+        "condition": "Any P0 metric below business_threshold",
+        "action": "retrain",
+        "priority": 1,
+        "example": "roc_auc < 0.75"
+      },
+      {
+        "condition": "Any P1 metric below business_threshold",
+        "action": "retrain",
+        "priority": 2,
+        "example": "accuracy < 0.70"
+      },
+      {
+        "condition": "Any P0 metric below data_science_threshold but >= business_threshold",
+        "action": "active_monitoring",
+        "priority": 3,
+        "example": "0.75 <= roc_auc < 0.80"
+      },
+      {
+        "condition": "Any P1 metric below data_science_threshold but >= business_threshold",
+        "action": "active_monitoring",
+        "priority": 4,
+        "example": "0.70 <= accuracy < 0.75"
+      },
+      {
+        "condition": "All P0 and P1 metrics above data_science_threshold",
+        "action": "monitor",
+        "priority": 5,
+        "example": "roc_auc >= 0.80 AND accuracy >= 0.75"
+      }
+    ],
+    "evaluation_order": "Rules evaluated in priority order (1-5), first match determines action"
+  },
+
+  "notification_config": {
+    "monitor": {
+      "channels": ["email"],
+      "recipients": ["ml-team@company.com"],
+      "frequency": "monthly",
+      "template": "Monthly monitoring report - all metrics healthy"
+    },
+    "active_monitoring": {
+      "channels": ["slack", "email"],
+      "recipients": ["#ml-monitoring", "ml-team@company.com"],
+      "frequency": "immediate",
+      "template": "WARNING: {metric} below DS threshold - Active monitoring required"
+    },
+    "retrain": {
+      "channels": ["pagerduty", "slack", "email"],
+      "recipients": ["oncall-ml-engineer", "#ml-monitoring", "ml-team@company.com", "risk-team@company.com"],
+      "frequency": "immediate",
+      "template": "CRITICAL: {metric} below business threshold - Model retraining required"
+    }
+  },
+
+  "model_specific_overrides": {
+    "description": "Model-specific threshold overrides (if needed)",
+    "model_1": {
+      "enabled": false,
+      "overrides": {}
+    },
+    "model_2": {
+      "enabled": false,
+      "overrides": {}
+    }
+  },
+
+  "historical_baselines": {
+    "description": "Baseline metrics from training for comparison",
+    "model_1": {
+      "oot_roc_auc": 0.8253,
+      "oot_accuracy": 0.7617,
+      "test_roc_auc": 0.8352,
+      "test_accuracy": 0.7568,
+      "training_date": "2025-10-25"
+    },
+    "model_2": {
+      "oot_roc_auc": 0.8472,
+      "oot_accuracy": 0.8126,
+      "test_roc_auc": 0.8612,
+      "test_accuracy": 0.8184,
+      "training_date": "2025-10-25"
+    }
+  },
+
+  "notes": {
+    "threshold_philosophy": "Business thresholds define minimum acceptable performance. Data Science thresholds provide early warning buffer to enable proactive intervention before reaching critical levels.",
+    "threshold_updates": "Thresholds should be reviewed quarterly based on business requirements, model performance trends, and regulatory changes.",
+    "priority_levels": {
+      "P0": "Critical business metric - directly impacts credit decisions",
+      "P1": "Important business metric - affects operational efficiency",
+      "P2": "Data Science operational metric - technical health indicator",
+      "P3": "Data Science diagnostic metric - detailed performance analysis"
+    }
+  }
+}

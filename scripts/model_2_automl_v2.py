@@ -246,6 +246,16 @@ def prepare_ml_dataset_with_config(df_train, spark, config):
         data_splits[f'X_{oot_key}'] = X[mask]
         data_splits[f'y_{oot_key}'] = y[mask]
 
+    split_counts = {
+        'train': len(data_splits['X_train']),
+        'val': len(data_splits['X_val']),
+        'test': len(data_splits['X_test'])
+    }
+    for oot_key in oot_keys:
+        split_counts[oot_key] = len(data_splits[f'X_{oot_key}'])
+
+    data_splits['split_counts'] = split_counts
+
     # Print summary
     print(f"\n{'='*60}")
     print("Temporal Split Summary")
@@ -259,6 +269,10 @@ def prepare_ml_dataset_with_config(df_train, spark, config):
         print(f"{oot_key.upper()}:        {oot_masks[oot_key].sum():6d} samples | {oot_period['start'].date()} to {oot_period['end'].date()}")
 
     print(f"Features:   {len(feature_cols)} columns")
+    empty_splits = [name.upper() for name, count in split_counts.items() if count == 0]
+    if empty_splits:
+        print(f"\n⚠️  Warning: The following splits have 0 samples after temporal filtering: {', '.join(empty_splits)}")
+        print("    Gradient Boosting training will skip preprocessing/evaluation for these splits.")
     print(f"{'='*60}\n")
 
     data_splits['oot_keys'] = oot_keys
@@ -276,6 +290,7 @@ def train_and_evaluate_gradient_boosting(data_splits, config):
     y_test = data_splits['y_test']
     feature_cols = data_splits['feature_cols']
     oot_keys = data_splits['oot_keys']
+    split_counts = data_splits.get('split_counts', {})
 
     print("\n" + "="*60)
     print("Training Model 2: Gradient Boosted Trees")
@@ -283,17 +298,33 @@ def train_and_evaluate_gradient_boosting(data_splits, config):
 
     model_params = config['training_params']['model_2']
 
+    if len(X_train) == 0 or len(y_train) == 0:
+        raise ValueError("Training split is empty after temporal filtering. Cannot train model.")
+
+    if len(X_val) == 0 or len(y_val) == 0:
+        raise ValueError(
+            "Validation split is empty after temporal filtering. "
+            "Need labelled data in the validation window before training can proceed."
+        )
+
     # Preprocessing
     imputer = SimpleImputer(strategy='median')
     X_train_imputed = imputer.fit_transform(X_train)
-    X_val_imputed = imputer.transform(X_val)
-    X_test_imputed = imputer.transform(X_test) if len(X_test) > 0 else None
+
+    def safe_impute(split_name, X_split):
+        if X_split is None or len(X_split) == 0:
+            print(f"⚠️  Skipping imputation for {split_name} split (0 samples).")
+            return None
+        return imputer.transform(X_split)
+
+    X_val_imputed = safe_impute("validation", X_val)
+    X_test_imputed = safe_impute("test", X_test)
 
     # Preprocess OOT datasets
     X_oot_imputed = {}
     for oot_key in oot_keys:
         X_oot = data_splits[f'X_{oot_key}']
-        X_oot_imputed[oot_key] = imputer.transform(X_oot) if len(X_oot) > 0 else None
+        X_oot_imputed[oot_key] = safe_impute(oot_key.upper(), X_oot)
 
     # Train model
     model = GradientBoostingClassifier(
@@ -349,11 +380,21 @@ def train_and_evaluate_gradient_boosting(data_splits, config):
     print(f"{'Split':<15} {'Accuracy':<12} {'ROC-AUC':<12} {'Samples':<10}")
     print("-"*60)
 
-    for split_key in ['train', 'val', 'test'] + oot_keys:
-        result = results[split_key]
+    ordered_split_keys = ['train', 'val', 'test'] + oot_keys
+
+    for split_key in ordered_split_keys:
+        result = results.get(split_key)
+        split_label = result['split'] if result else split_key.upper() if split_key in oot_keys else {
+            'train': 'Training',
+            'val': 'Validation',
+            'test': 'Test'
+        }.get(split_key, split_key.upper())
+        n_samples = len(data_splits[f'y_{split_key}']) if f'y_{split_key}' in data_splits else 0
+
         if result:
-            n_samples = len(data_splits[f'y_{split_key}'])
-            print(f"{result['split']:<15} {result['accuracy']:<12.4f} {result['roc_auc']:<12.4f} {n_samples:<10d}")
+            print(f"{split_label:<15} {result['accuracy']:<12.4f} {result['roc_auc']:<12.4f} {n_samples:<10d}")
+        else:
+            print(f"{split_label:<15} {'N/A':<12} {'N/A':<12} {n_samples:<10d}")
 
     print("-"*60)
 

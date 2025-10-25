@@ -1,23 +1,23 @@
 import argparse
-import os
 import json
+import os
+import warnings
 from datetime import datetime
-import pyspark
-import pyspark.sql.functions as F
-from pyspark.sql.functions import col
-import pandas as pd
+
 import numpy as np
+import pandas as pd
+import pyspark
 from sklearn.metrics import (
     accuracy_score,
-    roc_auc_score,
+    classification_report,
+    confusion_matrix,
+    f1_score,
     precision_score,
     recall_score,
-    f1_score,
-    confusion_matrix,
-    classification_report
+    roc_auc_score,
 )
-import warnings
-warnings.filterwarnings('ignore')
+
+warnings.filterwarnings("ignore")
 
 # Model 2 Monitoring Script
 # Purpose: Calculate performance metrics for Model 2 predictions
@@ -48,15 +48,19 @@ def load_predictions(snapshot_date_str, spark):
 
     if not os.path.exists(predictions_file):
         print(f"⚠️  Predictions file not found: {predictions_file}")
-        print(f"   This is expected for snapshot dates within 6 months of pipeline start.")
-        print(f"   Predictions are made at mob=0, labels are at mob=6.")
-        print(f"   Need predictions from {prediction_date_str} to match labels from {snapshot_date_str}")
+        print(
+            "   This is expected for snapshot dates within 6 months of pipeline start."
+        )
+        print("   Predictions are made at mob=0, labels are at mob=6.")
+        print(
+            f"   Need predictions from {prediction_date_str} to match labels from {snapshot_date_str}"
+        )
         raise FileNotFoundError(f"Predictions file not found: {predictions_file}")
 
     print(f"\nLoading predictions from: {predictions_file}")
     print(f"  Prediction date (mob=0): {prediction_date_str}")
     print(f"  Label date (mob=6):      {snapshot_date_str}")
-    print(f"  These loans should match after 6-month maturation period")
+    print("  These loans should match after 6-month maturation period")
     df_predictions = spark.read.parquet(predictions_file)
 
     print(f"Loaded predictions: {df_predictions.count()} rows")
@@ -90,15 +94,15 @@ def load_labels(snapshot_date_str, spark):
 def join_predictions_and_labels(df_predictions, df_labels):
     """Join predictions with ground truth labels"""
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("Joining Predictions with Labels")
-    print("="*60)
+    print("=" * 60)
 
     # Join on loan_id and Customer_ID
     df_joined = df_predictions.join(
         df_labels.select("loan_id", "Customer_ID", "label", "label_def"),
         on=["loan_id", "Customer_ID"],
-        how="inner"
+        how="inner",
     )
 
     print(f"Joined data: {df_joined.count()} rows")
@@ -112,22 +116,18 @@ def join_predictions_and_labels(df_predictions, df_labels):
 def calculate_metrics(df_joined):
     """Calculate performance metrics"""
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("Calculating Performance Metrics")
-    print("="*60)
+    print("=" * 60)
 
     # Convert to pandas for sklearn metrics
     pdf = df_joined.select(
-        "loan_id",
-        "Customer_ID",
-        "prediction_proba",
-        "prediction_label",
-        "label"
+        "loan_id", "Customer_ID", "prediction_proba", "prediction_label", "label"
     ).toPandas()
 
-    y_true = pdf['label'].values
-    y_pred = pdf['prediction_label'].values
-    y_proba = pdf['prediction_proba'].values
+    y_true = pdf["label"].values
+    y_pred = pdf["prediction_label"].values
+    y_proba = pdf["prediction_proba"].values
 
     # Calculate metrics
     accuracy = accuracy_score(y_true, y_pred)
@@ -162,9 +162,9 @@ def calculate_metrics(df_joined):
     median_proba = np.median(y_proba)
 
     # Print summary
-    print(f"\nPerformance Metrics Summary:")
-    print(f"{'─'*60}")
-    print(f"Overall Metrics:")
+    print("\nPerformance Metrics Summary:")
+    print(f"{'─' * 60}")
+    print("Overall Metrics:")
     print(f"  Accuracy:   {accuracy:.4f}")
     if roc_auc is not None:
         print(f"  ROC-AUC:    {roc_auc:.4f}")
@@ -172,19 +172,27 @@ def calculate_metrics(df_joined):
     print(f"  Recall:     {recall:.4f}")
     print(f"  F1-Score:   {f1:.4f}")
 
-    print(f"\nConfusion Matrix:")
-    print(f"                Predicted")
-    print(f"               No Default  Default")
+    print("\nConfusion Matrix:")
+    print("                Predicted")
+    print("               No Default  Default")
     print(f"Actual No Def    {tn:6d}     {fp:6d}")
     print(f"Actual Default   {fn:6d}     {tp:6d}")
 
-    print(f"\nClass Distribution:")
-    print(f"  Actual Positives (Default):     {actual_positives:6d} ({100*actual_positives/total_samples:5.2f}%)")
-    print(f"  Actual Negatives (No Default):  {actual_negatives:6d} ({100*actual_negatives/total_samples:5.2f}%)")
-    print(f"  Predicted Positives (Default):  {predicted_positives:6d} ({100*predicted_positives/total_samples:5.2f}%)")
-    print(f"  Predicted Negatives (No Default): {predicted_negatives:6d} ({100*predicted_negatives/total_samples:5.2f}%)")
+    print("\nClass Distribution:")
+    print(
+        f"  Actual Positives (Default):     {actual_positives:6d} ({100 * actual_positives / total_samples:5.2f}%)"
+    )
+    print(
+        f"  Actual Negatives (No Default):  {actual_negatives:6d} ({100 * actual_negatives / total_samples:5.2f}%)"
+    )
+    print(
+        f"  Predicted Positives (Default):  {predicted_positives:6d} ({100 * predicted_positives / total_samples:5.2f}%)"
+    )
+    print(
+        f"  Predicted Negatives (No Default): {predicted_negatives:6d} ({100 * predicted_negatives / total_samples:5.2f}%)"
+    )
 
-    print(f"\nPrediction Probability Statistics:")
+    print("\nPrediction Probability Statistics:")
     print(f"  Mean:   {mean_proba:.4f}")
     print(f"  Median: {median_proba:.4f}")
     print(f"  Std:    {std_proba:.4f}")
@@ -192,32 +200,32 @@ def calculate_metrics(df_joined):
     print(f"  Max:    {max_proba:.4f}")
 
     # Detailed classification report
-    print(f"\nDetailed Classification Report:")
-    print(classification_report(y_true, y_pred, target_names=['No Default', 'Default']))
+    print("\nDetailed Classification Report:")
+    print(classification_report(y_true, y_pred, target_names=["No Default", "Default"]))
 
     # Compile metrics into dictionary
     metrics = {
-        'model_id': 'model_2',
-        'model_type': 'gradient_boosting',
-        'accuracy': float(accuracy),
-        'roc_auc': float(roc_auc) if roc_auc is not None else None,
-        'precision': float(precision),
-        'recall': float(recall),
-        'f1_score': float(f1),
-        'true_negatives': int(tn),
-        'false_positives': int(fp),
-        'false_negatives': int(fn),
-        'true_positives': int(tp),
-        'total_samples': int(total_samples),
-        'actual_positives': int(actual_positives),
-        'actual_negatives': int(actual_negatives),
-        'predicted_positives': int(predicted_positives),
-        'predicted_negatives': int(predicted_negatives),
-        'mean_prediction_proba': float(mean_proba),
-        'median_prediction_proba': float(median_proba),
-        'std_prediction_proba': float(std_proba),
-        'min_prediction_proba': float(min_proba),
-        'max_prediction_proba': float(max_proba)
+        "model_id": "model_2",
+        "model_type": "gradient_boosting",
+        "accuracy": float(accuracy),
+        "roc_auc": float(roc_auc) if roc_auc is not None else None,
+        "precision": float(precision),
+        "recall": float(recall),
+        "f1_score": float(f1),
+        "true_negatives": int(tn),
+        "false_positives": int(fp),
+        "false_negatives": int(fn),
+        "true_positives": int(tp),
+        "total_samples": int(total_samples),
+        "actual_positives": int(actual_positives),
+        "actual_negatives": int(actual_negatives),
+        "predicted_positives": int(predicted_positives),
+        "predicted_negatives": int(predicted_negatives),
+        "mean_prediction_proba": float(mean_proba),
+        "median_prediction_proba": float(median_proba),
+        "std_prediction_proba": float(std_proba),
+        "min_prediction_proba": float(min_proba),
+        "max_prediction_proba": float(max_proba),
     }
 
     return metrics
@@ -238,22 +246,22 @@ def save_metrics(metrics, snapshot_date_str, spark):
     output_file = f"{monitoring_dir}model_2_metrics_{file_date_str}.parquet"
 
     # Add metadata
-    metrics['snapshot_date'] = snapshot_date_str
-    metrics['monitoring_timestamp'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    metrics["snapshot_date"] = snapshot_date_str
+    metrics["monitoring_timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # Convert to DataFrame and save
     metrics_pdf = pd.DataFrame([metrics])
     df_metrics = spark.createDataFrame(metrics_pdf)
 
-    df_metrics.write.mode('overwrite').parquet(output_file)
+    df_metrics.write.mode("overwrite").parquet(output_file)
 
     print(f"\n✅ Saved metrics to: {output_file}")
     print(f"   Columns: {df_metrics.columns}")
     print(f"   Rows: {df_metrics.count()}")
 
     # Also save as JSON for easy reading
-    json_output_file = output_file.replace('.parquet', '.json')
-    with open(json_output_file, 'w') as f:
+    json_output_file = output_file.replace(".parquet", ".json")
+    with open(json_output_file, "w") as f:
         json.dump(metrics, f, indent=2)
     print(f"✅ Saved metrics (JSON) to: {json_output_file}")
 
@@ -261,24 +269,31 @@ def save_metrics(metrics, snapshot_date_str, spark):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Model 2 Monitoring: Calculate performance metrics')
-    parser.add_argument('--snapshotdate', type=str, required=True,
-                        help='Snapshot date for monitoring (YYYY-MM-DD)')
+    parser = argparse.ArgumentParser(
+        description="Model 2 Monitoring: Calculate performance metrics"
+    )
+    parser.add_argument(
+        "--snapshotdate",
+        type=str,
+        required=True,
+        help="Snapshot date for monitoring (YYYY-MM-DD)",
+    )
 
     args = parser.parse_args()
     snapshotdate = args.snapshotdate
 
-    print("="*60)
-    print(f"Model 2 Monitoring - Gradient Boosting")
-    print("="*60)
+    print("=" * 60)
+    print("Model 2 Monitoring - Gradient Boosting")
+    print("=" * 60)
     print(f"Snapshot Date: {snapshotdate}")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
     # Initialize Spark
-    spark = pyspark.sql.SparkSession.builder \
-        .appName("Model2_Monitoring") \
-        .config("spark.driver.memory", "4g") \
+    spark = (
+        pyspark.sql.SparkSession.builder.appName("Model2_Monitoring")
+        .config("spark.driver.memory", "4g")
         .getOrCreate()
+    )
 
     spark.sparkContext.setLogLevel("ERROR")
 
@@ -303,20 +318,21 @@ def main():
         print("\n[Step 5/5] Saving metrics...")
         output_file = save_metrics(metrics, snapshotdate, spark)
 
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("✅ Model 2 Monitoring Completed Successfully")
-        print("="*60)
+        print("=" * 60)
         print(f"Output: {output_file}")
-        print(f"Key Metrics:")
+        print("Key Metrics:")
         print(f"  Accuracy: {metrics['accuracy']:.4f}")
-        if metrics['roc_auc'] is not None:
+        if metrics["roc_auc"] is not None:
             print(f"  ROC-AUC:  {metrics['roc_auc']:.4f}")
         print(f"  F1-Score: {metrics['f1_score']:.4f}")
-        print("="*60 + "\n")
+        print("=" * 60 + "\n")
 
     except Exception as e:
         print(f"\n❌ Error during monitoring: {str(e)}")
         import traceback
+
         traceback.print_exc()
         raise
 
