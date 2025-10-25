@@ -107,6 +107,31 @@ def process_features_gold_table(snapshot_date_str, silver_directories, gold_feat
             existing_columns = set(df_features.columns)
 
             # ============================================================================
+            # FEATURE ENGINEERING: PMET Classification (MUST happen before dropping Occupation)
+            # - Reduce high cardinality of Occupation into binary PMET indicator
+            # - PMET = Professionals, Managers, Executives, Technicians
+            # - Preserves predictive signal (income stability, education) while reducing complexity
+            # ============================================================================
+            if 'Occupation' in other_table.columns:
+                # Define PMET occupations based on formal education, professional certification, stable employment
+                PMET_occupations = [
+                    'LAWYER', 'DOCTOR', 'ACCOUNTANT', 'MANAGER', 'SCIENTIST',
+                    'ARCHITECT', 'TEACHER', 'ENGINEER', 'DEVELOPER',
+                    'MEDIA_MANAGER', 'JOURNALIST'
+                ]
+
+                # Create binary PMET indicator
+                # Note: Occupation is already uppercased in silver layer
+                other_table = other_table.withColumn(
+                    'is_PMET',
+                    F.when(
+                        col('Occupation').isNotNull() & col('Occupation').isin(PMET_occupations),
+                        1
+                    ).otherwise(0)
+                )
+                print(f'Created is_PMET feature from Occupation (PMET occupations: {len(PMET_occupations)})')
+
+            # ============================================================================
             # FEATURE SELECTION: Drop non-predictive identifiers and raw categoricals
             # - SSN: Unique identifier with no predictive power, privacy risk
             # - valid_ssn: Silver validation flag for SSN (not needed in gold)
@@ -141,31 +166,6 @@ def process_features_gold_table(snapshot_date_str, silver_directories, gold_feat
                     print(f'Warning: missing engineered financial features in silver financials: {missing_engineered}')
                 else:
                     print(f'Retaining engineered financial features: {engineered_financial_features}')
-
-            # ============================================================================
-            # FEATURE ENGINEERING: PMET Classification
-            # - Reduce high cardinality of Occupation into binary PMET indicator
-            # - PMET = Professionals, Managers, Executives, Technicians
-            # - Preserves predictive signal (income stability, education) while reducing complexity
-            # ============================================================================
-            if 'Occupation' in other_table.columns:
-                # Define PMET occupations based on formal education, professional certification, stable employment
-                PMET_occupations = [
-                    'LAWYER', 'DOCTOR', 'ACCOUNTANT', 'MANAGER', 'SCIENTIST',
-                    'ARCHITECT', 'TEACHER', 'ENGINEER', 'DEVELOPER',
-                    'MEDIA_MANAGER', 'JOURNALIST'
-                ]
-
-                # Create binary PMET indicator
-                # Note: Occupation is already uppercased in silver layer
-                other_table = other_table.withColumn(
-                    'is_PMET',
-                    F.when(
-                        col('Occupation').isNotNull() & col('Occupation').isin(PMET_occupations),
-                        1
-                    ).otherwise(0)
-                )
-                print(f'Created is_PMET feature from Occupation (PMET occupations: {len(PMET_occupations)})')
 
             # ============================================================================
             # FEATURE ENGINEERING: Payment_Behavior Decomposition
