@@ -1,0 +1,56 @@
+{
+  "model_name": "gradient_boosting",
+  "model_id": "model_2",
+  "train_accuracy": 0.9378986236992279,
+  "val_accuracy": 0.8236459709379128,
+  "train_roc_auc": 0.9807434601321303,
+  "val_roc_auc": 0.8737374676042087,
+  "test_accuracy": 0.8107569721115537,
+  "test_roc_auc": 0.8485418082445308,
+  "feature_count": 85,
+  "train_samples": 5958,
+  "val_samples": 1514,
+  "test_samples": 1004,
+  "oot_accuracy": 0.8253012048192772,
+  "oot_roc_auc": 0.8866923728016552,
+  "oot_samples": 498,
+  "training_date": "2025-10-25 16:46:13",
+  "snapshot_date": "2024-12-01",
+  "label_definition": "30dpd_6mob",
+  "model_type": "Gradient Boosting Classifier",
+  "temporal_splits": {
+    "train": {
+      "start_date": "2023-01-01",
+      "end_date": "2023-12-01",
+      "description": "Training period - earliest data for model learning"
+    },
+    "validation": {
+      "start_date": "2024-01-01",
+      "end_date": "2024-03-01",
+      "description": "Validation period - hyperparameter tuning and model selection"
+    },
+    "test": {
+      "start_date": "2024-04-01",
+      "end_date": "2024-05-01",
+      "description": "Test period - final evaluation before deployment"
+    },
+    "oot": {
+      "start_date": "2024-06-01",
+      "end_date": "2024-06-01",
+      "description": "Out-of-Time period - production simulation with completely unseen future data"
+    }
+  },
+  "hyperparameters": {
+    "model_type": "gradient_boosting",
+    "n_estimators": 100,
+    "learning_rate": 0.1,
+    "max_depth": 5,
+    "min_samples_split": 20,
+    "min_samples_leaf": 10,
+    "subsample": 0.8,
+    "random_state": 42
+  },
+  "preprocessing": {
+    "imputation": "median"
+  }
+}
