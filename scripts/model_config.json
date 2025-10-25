@@ -3,7 +3,7 @@
   "comment": "Define train/validation/test/OOT periods to prevent data leakage and simulate production deployment",
   "date_convention": "BOTH start_date and end_date are INCLUSIVE [start_date, end_date]. Example: train 2023-01-01 to 2023-08-01 includes BOTH Jan 1 and Aug 1 snapshots.",
 
-  "temporal_window_mode": "relative",
+  "temporal_window_mode": "absolute",
   "mode_description": "Use 'absolute' for fixed dates (initial training) or 'relative' for dynamic rolling windows (retraining)",
 
   "relative_windows": {

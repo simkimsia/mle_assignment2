@@ -48,25 +48,54 @@ def check_inference_completed_for_monitoring(**context):
     """
     Check if inference completed successfully before running monitoring.
 
-    This operator is downstream of inference tasks, so if we reach here,
-    inference either completed or was skipped. We check the previous task states.
+    TEMPORAL REQUIREMENT:
+    - Monitoring joins predictions (from mob=0) with labels (from mob=6)
+    - Labels on snapshot_date are for loans at mob=6
+    - These loans were at mob=0 exactly 6 months earlier
+    - So monitoring requires predictions from 6 months before snapshot_date
 
-    For simplicity, we use the same logic as inference check:
-    - If models exist, inference should have run, so proceed with monitoring
-    - If models don't exist, inference was skipped, so skip monitoring too
+    Returns True only if:
+    1. Models exist (so inference runs)
+    2. Predictions from 6 months ago exist (for temporal matching with today's labels)
     """
     import os
+    from datetime import datetime
+    from dateutil.relativedelta import relativedelta
 
+    # Check if models exist
     model_1_path = '/opt/airflow/scripts/model_store/model_1/model.pkl'
     model_2_path = '/opt/airflow/scripts/model_store/model_2/model.pkl'
-
     models_exist = os.path.exists(model_1_path) and os.path.exists(model_2_path)
 
-    if models_exist:
-        print("✅ Models exist and inference should have completed. Proceeding with monitoring.")
+    if not models_exist:
+        print("⏭️  Skipping monitoring - models don't exist yet.")
+        return False
+
+    # Check if predictions from 6 months ago exist
+    execution_date_str = context['ds']  # Format: YYYY-MM-DD
+    execution_date = datetime.strptime(execution_date_str, '%Y-%m-%d')
+    prediction_date = execution_date - relativedelta(months=6)
+    prediction_date_str = prediction_date.strftime('%Y_%m_%d')
+
+    predictions_dir = '/opt/airflow/scripts/datamart/gold/predictions/'
+    model_1_predictions = f"{predictions_dir}model_1_predictions_{prediction_date_str}.parquet"
+    model_2_predictions = f"{predictions_dir}model_2_predictions_{prediction_date_str}.parquet"
+
+    predictions_exist = os.path.exists(model_1_predictions) and os.path.exists(model_2_predictions)
+
+    if predictions_exist:
+        print("✅ Models and predictions from 6 months ago exist. Proceeding with monitoring.")
+        print(f"   Prediction date: {prediction_date.strftime('%Y-%m-%d')}")
+        print(f"   Label date: {execution_date_str}")
         return True
     else:
-        print("⏭️  Skipping monitoring - no models/inference to monitor.")
+        print("⏭️  Skipping monitoring - predictions from 6 months ago don't exist.")
+        print(f"   Need predictions from: {prediction_date.strftime('%Y-%m-%d')}")
+        print("   This is expected for the first 6 months after inference starts.")
+        if not os.path.exists(model_1_predictions):
+            print(f"   Missing: {model_1_predictions}")
+        if not os.path.exists(model_2_predictions):
+            print(f"   Missing: {model_2_predictions}")
         return False
 
 
@@ -272,9 +301,23 @@ with DAG(
 
     model_monitor_start = DummyOperator(task_id="model_monitor_start")
 
-    model_1_monitor = DummyOperator(task_id="model_1_monitor")
+    model_1_monitor = BashOperator(
+        task_id='model_1_monitor',
+        bash_command=(
+            'cd /opt/airflow/scripts && '
+            'python3 model_1_monitor.py '
+            '--snapshotdate "{{ ds }}"'
+        ),
+    )
 
-    model_2_monitor = DummyOperator(task_id="model_2_monitor")
+    model_2_monitor = BashOperator(
+        task_id='model_2_monitor',
+        bash_command=(
+            'cd /opt/airflow/scripts && '
+            'python3 model_2_monitor.py '
+            '--snapshotdate "{{ ds }}"'
+        ),
+    )
 
     model_monitor_completed = DummyOperator(task_id="model_monitor_completed")
 
