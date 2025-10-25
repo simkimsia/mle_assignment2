@@ -380,10 +380,7 @@ with DAG(
     # Generate performance visualizations after monitoring completes
     visualize_monitoring = BashOperator(
         task_id="visualize_monitoring",
-        bash_command=(
-            "cd /opt/airflow/scripts && "
-            "python3 visualize_monitoring.py"
-        ),
+        bash_command=("cd /opt/airflow/scripts && python3 visualize_monitoring.py"),
         trigger_rule="all_done",  # Run even if monitoring has issues
     )
 
@@ -446,7 +443,7 @@ with DAG(
             "cd /opt/airflow/scripts && "
             "python3 seed_inference_backfill.py "
             '--snapshotdate "{{ ds }}" '
-            "--backfill-months 6"
+            "--backfill-months 8"
         ),
     )
 
