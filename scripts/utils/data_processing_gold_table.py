@@ -111,6 +111,7 @@ def process_features_gold_table(snapshot_date_str, silver_directories, gold_feat
             # - SSN: Unique identifier with no predictive power, privacy risk
             # - valid_ssn: Silver validation flag for SSN (not needed in gold)
             # - Name: No predictive value, high cardinality, privacy concerns
+            # - Occupation: Raw categorical (replaced by is_PMET binary indicator)
             # - Payment_of_Min_Amount: Raw categorical (replaced by payment_min_yes/payment_min_nm)
             # - valid_payment_of_min_amount: Silver validation flag (not needed in gold)
             # - Credit_Mix: Raw categorical (replaced by credit_mix_good/credit_mix_standard/credit_mix_bad)
@@ -122,6 +123,7 @@ def process_features_gold_table(snapshot_date_str, silver_directories, gold_feat
             # ============================================================================
             non_predictive_cols = [
                 'SSN', 'valid_ssn', 'Name',
+                'Occupation',  # Replaced by is_PMET
                 'Payment_of_Min_Amount', 'valid_payment_of_min_amount',
                 'Credit_Mix', 'valid_credit_mix',
                 'Credit_History_Age', 'valid_credit_history_age',
