@@ -1,6 +1,7 @@
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.operators.dummy import DummyOperator
+from airflow.operators.python import ShortCircuitOperator
 from datetime import datetime, timedelta
 
 default_args = {
@@ -9,6 +10,98 @@ default_args = {
     'retries': 1,
     'retry_delay': timedelta(minutes=5),
 }
+
+def check_models_exist_for_inference(**context):
+    """
+    Check if trained models exist before running inference.
+
+    Models are stored in:
+    - /opt/airflow/scripts/model_store/model_1/model.pkl
+    - /opt/airflow/scripts/model_store/model_2/model.pkl
+
+    Returns True only if both models exist.
+    """
+    import os
+
+    model_1_path = '/opt/airflow/scripts/model_store/model_1/model.pkl'
+    model_2_path = '/opt/airflow/scripts/model_store/model_2/model.pkl'
+
+    model_1_exists = os.path.exists(model_1_path)
+    model_2_exists = os.path.exists(model_2_path)
+
+    if model_1_exists and model_2_exists:
+        print("✅ Both models exist. Proceeding with inference.")
+        print(f"   Model 1: {model_1_path}")
+        print(f"   Model 2: {model_2_path}")
+        return True
+    else:
+        print("⏭️  Skipping inference - models not yet trained.")
+        if not model_1_exists:
+            print(f"   Missing: {model_1_path}")
+        if not model_2_exists:
+            print(f"   Missing: {model_2_path}")
+        print("   Models will be available after training completes (execution_date >= 2024-06-01).")
+        return False
+
+
+def check_inference_completed_for_monitoring(**context):
+    """
+    Check if inference completed successfully before running monitoring.
+
+    This operator is downstream of inference tasks, so if we reach here,
+    inference either completed or was skipped. We check the previous task states.
+
+    For simplicity, we use the same logic as inference check:
+    - If models exist, inference should have run, so proceed with monitoring
+    - If models don't exist, inference was skipped, so skip monitoring too
+    """
+    import os
+
+    model_1_path = '/opt/airflow/scripts/model_store/model_1/model.pkl'
+    model_2_path = '/opt/airflow/scripts/model_store/model_2/model.pkl'
+
+    models_exist = os.path.exists(model_1_path) and os.path.exists(model_2_path)
+
+    if models_exist:
+        print("✅ Models exist and inference should have completed. Proceeding with monitoring.")
+        return True
+    else:
+        print("⏭️  Skipping monitoring - no models/inference to monitor.")
+        return False
+
+
+def check_sufficient_data_for_training(**context):
+    """
+    Check if we have sufficient data for model training.
+
+    DYNAMIC WINDOWS (relative mode):
+      The model config uses relative windows that calculate backwards from snapshot_date.
+      With 12-month training + 3-month validation + 2-month test + 1-month OOT,
+      we need 18 months of data. Starting from 2023-01-01, the earliest we can train
+      is when snapshot_date reaches 2024-06-01.
+
+    FIXED WINDOWS (absolute mode):
+      Uses hardcoded dates. Still requires data through 2024-06-01 for OOT period.
+
+    RETRAINING:
+      After initial training, this allows monthly retraining with rolling windows.
+      To control retraining frequency, adjust the DAG schedule or add custom logic here.
+
+    Returns True only if execution_date >= 2024-06-01.
+    """
+    execution_date = context['ds']  # Format: YYYY-MM-DD
+    min_date_for_training = '2024-06-01'
+
+    should_train = execution_date >= min_date_for_training
+
+    if should_train:
+        print(f"✅ Sufficient data available (execution_date={execution_date}). Proceeding with model training.")
+        print("   Training will use data from calculated temporal windows based on this snapshot_date.")
+    else:
+        print(f"⏭️  Skipping model training (execution_date={execution_date} < {min_date_for_training}). Insufficient data.")
+        print("   Need at least 18 months of data (12 train + 3 val + 2 test + 1 OOT).")
+
+    return should_train
 
 with DAG(
     'dag',
@@ -130,21 +223,53 @@ with DAG(
 
 
     # --- model inference ---
+
+    # Check if models exist before attempting inference
+    check_models_for_inference = ShortCircuitOperator(
+        task_id='check_models_for_inference',
+        python_callable=check_models_exist_for_inference,
+        provide_context=True
+    )
+
     model_inference_start = DummyOperator(task_id="model_inference_start")
 
-    model_1_inference = DummyOperator(task_id="model_1_inference")
+    model_1_inference = BashOperator(
+        task_id='model_1_inference',
+        bash_command=(
+            'cd /opt/airflow/scripts && '
+            'python3 model_1_inference.py '
+            '--snapshotdate "{{ ds }}"'
+        ),
+    )
 
-    model_2_inference = DummyOperator(task_id="model_2_inference")
+    model_2_inference = BashOperator(
+        task_id='model_2_inference',
+        bash_command=(
+            'cd /opt/airflow/scripts && '
+            'python3 model_2_inference.py '
+            '--snapshotdate "{{ ds }}"'
+        ),
+    )
 
     model_inference_completed = DummyOperator(task_id="model_inference_completed")
-    
+
     # Define task dependencies to run scripts sequentially
-    feature_store_completed >> model_inference_start
+    # Only run inference if models exist
+    feature_store_completed >> check_models_for_inference
+    check_models_for_inference >> model_inference_start
     model_inference_start >> model_1_inference >> model_inference_completed
     model_inference_start >> model_2_inference >> model_inference_completed
 
 
     # --- model monitoring ---
+
+    # Check if inference completed before attempting monitoring
+    check_inference_for_monitoring = ShortCircuitOperator(
+        task_id='check_inference_for_monitoring',
+        python_callable=check_inference_completed_for_monitoring,
+        provide_context=True
+    )
+
     model_monitor_start = DummyOperator(task_id="model_monitor_start")
 
     model_1_monitor = DummyOperator(task_id="model_1_monitor")
@@ -152,14 +277,23 @@ with DAG(
     model_2_monitor = DummyOperator(task_id="model_2_monitor")
 
     model_monitor_completed = DummyOperator(task_id="model_monitor_completed")
-    
+
     # Define task dependencies to run scripts sequentially
-    model_inference_completed >> model_monitor_start
+    # Only run monitoring if inference completed
+    model_inference_completed >> check_inference_for_monitoring
+    check_inference_for_monitoring >> model_monitor_start
     model_monitor_start >> model_1_monitor >> model_monitor_completed
     model_monitor_start >> model_2_monitor >> model_monitor_completed
 
 
     # --- model auto training ---
+
+    # Check if we have enough data before running model training
+    check_training_data = ShortCircuitOperator(
+        task_id='check_training_data',
+        python_callable=check_sufficient_data_for_training,
+        provide_context=True
+    )
 
     model_automl_start = DummyOperator(task_id="model_automl_start")
 
@@ -184,9 +318,11 @@ with DAG(
     )
 
     model_automl_completed = DummyOperator(task_id="model_automl_completed")
-    
+
     # Define task dependencies to run scripts sequentially
-    feature_store_completed >> model_automl_start
-    label_store_completed >> model_automl_start
+    # Only run model training if we have sufficient data (>= 2024-06-01)
+    feature_store_completed >> check_training_data
+    label_store_completed >> check_training_data
+    check_training_data >> model_automl_start
     model_automl_start >> model_1_automl >> model_automl_completed
     model_automl_start >> model_2_automl >> model_automl_completed

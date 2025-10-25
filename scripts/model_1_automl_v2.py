@@ -3,6 +3,7 @@ import os
 import glob
 import json
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
 import pyspark
 import pyspark.sql.functions as F
 from pyspark.sql.functions import col
@@ -20,7 +21,65 @@ warnings.filterwarnings('ignore')
 # to call this script: python model_1_automl_v2.py --snapshotdate "2024-12-01" --config model_config.json
 
 
-def load_config(config_path="model_config.json"):
+def calculate_relative_windows(snapshot_date_str, relative_config):
+    """
+    Calculate temporal windows dynamically based on snapshot date and relative offsets.
+    Works BACKWARD from snapshot_date (latest available data).
+
+    Logic: snapshot_date represents the latest data available.
+    OOT uses the most recent data, then we work backwards: test, validation, training.
+
+    This enables rolling window retraining in production.
+    """
+    snapshot_date = datetime.strptime(snapshot_date_str, "%Y-%m-%d")
+
+    # Get configuration
+    train_months_back = relative_config['train']['months_back']
+    val_months = relative_config['validation']['months_after_train_end']
+    test_months = relative_config['test']['months_after_validation_end']
+    oot_months = relative_config['oot']['months_after_test_end']
+
+    # OOT period: uses the latest available data (ending at snapshot_date)
+    oot_end = snapshot_date
+    oot_start = oot_end - relativedelta(months=oot_months - 1)
+
+    # Test period: comes before OOT
+    test_end = oot_start - relativedelta(months=1)
+    test_start = test_end - relativedelta(months=test_months - 1)
+
+    # Validation period: comes before test
+    val_end = test_start - relativedelta(months=1)
+    val_start = val_end - relativedelta(months=val_months - 1)
+
+    # Training period: comes before validation
+    train_end = val_start - relativedelta(months=1)
+    train_start = train_end - relativedelta(months=train_months_back - 1)
+
+    return {
+        'train': {
+            'start_date': train_start.strftime("%Y-%m-%d"),
+            'end_date': train_end.strftime("%Y-%m-%d"),
+            'description': f'Training - {train_months_back} months before snapshot'
+        },
+        'validation': {
+            'start_date': val_start.strftime("%Y-%m-%d"),
+            'end_date': val_end.strftime("%Y-%m-%d"),
+            'description': f'Validation - {val_months} months after training'
+        },
+        'test': {
+            'start_date': test_start.strftime("%Y-%m-%d"),
+            'end_date': test_end.strftime("%Y-%m-%d"),
+            'description': f'Test - {test_months} months after validation'
+        },
+        'oot': {
+            'start_date': oot_start.strftime("%Y-%m-%d"),
+            'end_date': oot_end.strftime("%Y-%m-%d"),
+            'description': f'OOT - {oot_months} month(s) after test'
+        }
+    }
+
+
+def load_config(config_path="model_config.json", snapshot_date_str=None):
     """Load training configuration from JSON file"""
     if not os.path.exists(config_path):
         print(f"Warning: Config file {config_path} not found. Using default temporal split.")
@@ -28,6 +87,23 @@ def load_config(config_path="model_config.json"):
 
     with open(config_path, 'r') as f:
         config = json.load(f)
+
+    # Check if we should use relative windows
+    mode = config.get('temporal_window_mode', 'absolute')
+
+    if mode == 'relative' and snapshot_date_str:
+        print(f"\n🔄 Using RELATIVE temporal windows (dynamic/production mode)")
+        print(f"   Calculating windows based on snapshot_date: {snapshot_date_str}\n")
+
+        relative_config = config['relative_windows']
+        temporal_splits = calculate_relative_windows(snapshot_date_str, relative_config)
+        config['temporal_splits'] = temporal_splits
+    else:
+        if mode == 'relative' and not snapshot_date_str:
+            print(f"\n⚠️  WARNING: Config set to 'relative' mode but no snapshot_date provided.")
+            print(f"   Falling back to ABSOLUTE temporal splits from config.\n")
+        else:
+            print(f"\n📅 Using ABSOLUTE temporal windows (fixed dates)\n")
 
     temporal_splits = config['temporal_splits']
 
@@ -93,6 +169,12 @@ def load_training_data(snapshot_date_str, spark, config=None):
     print(f"Loaded features: {df_features.count()} rows")
     print(f"Loaded labels: {df_labels.count()} rows")
 
+    # Check if labels exist
+    if df_labels.count() == 0:
+        print(f"Error: No labels found up to {snapshot_date_str}")
+        print(f"Insufficient data for model training. Need data through at least validation period.")
+        return None, None
+
     # Join features with labels on loan_id and Customer_ID
     df_train = df_features.join(
         df_labels.select("loan_id", "Customer_ID", "label", "label_def"),
@@ -101,6 +183,12 @@ def load_training_data(snapshot_date_str, spark, config=None):
     )
 
     print(f"Joined training data: {df_train.count()} rows")
+
+    # Check if join produced any results
+    if df_train.count() == 0:
+        print(f"Error: No training data after joining features and labels")
+        print(f"Insufficient data for model training.")
+        return None, None
 
     return df_train, df_labels.select("label_def").first()["label_def"]
 
@@ -496,8 +584,8 @@ def save_model_artifacts(model, metrics, preprocessing, feature_importance,
 def main(snapshotdate, config_path="model_config.json"):
     print('\n\n---starting job: model_1_automl_v2 (with temporal config)---\n\n')
 
-    # Load config
-    config = load_config(config_path)
+    # Load config (pass snapshot_date for dynamic window calculation)
+    config = load_config(config_path, snapshot_date_str=snapshotdate)
 
     if config is None:
         print("ERROR: Config file required for v2 script. Exiting.")
