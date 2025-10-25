@@ -162,10 +162,26 @@ with DAG(
     # --- model auto training ---
 
     model_automl_start = DummyOperator(task_id="model_automl_start")
-    
-    model_1_automl = DummyOperator(task_id="model_1_automl")
 
-    model_2_automl = DummyOperator(task_id="model_2_automl")
+    model_1_automl = BashOperator(
+        task_id='model_1_automl',
+        bash_command=(
+            'cd /opt/airflow/scripts && '
+            'python3 model_1_automl_v2.py '
+            '--snapshotdate "{{ ds }}" '
+            '--config model_config.json'
+        ),
+    )
+
+    model_2_automl = BashOperator(
+        task_id='model_2_automl',
+        bash_command=(
+            'cd /opt/airflow/scripts && '
+            'python3 model_2_automl_v2.py '
+            '--snapshotdate "{{ ds }}" '
+            '--config model_config.json'
+        ),
+    )
 
     model_automl_completed = DummyOperator(task_id="model_automl_completed")
     
