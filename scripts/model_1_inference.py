@@ -18,12 +18,83 @@ warnings.filterwarnings('ignore')
 # Input: Gold feature store + trained model artifacts
 # Output: datamart/gold/predictions/model_1_predictions_YYYY_MM_DD.parquet
 
+DATAMART_ROOT_ENV_VAR = "DATAMART_ROOT"
+DATAMART_ROOT_CANDIDATES = [
+    os.environ.get(DATAMART_ROOT_ENV_VAR),
+    "datamart",
+    "scripts/datamart",
+    "/opt/airflow/scripts/datamart",
+]
 
-def load_model_artifacts(model_store_dir="model_store/model_1/"):
+MODEL_STORE_ROOT_CANDIDATES = [
+    "model_store",
+    "scripts/model_store",
+    "/opt/airflow/scripts/model_store",
+]
+
+
+def get_datamart_roots():
+    """Return ordered list of candidate datamart roots (deduplicated)."""
+    roots = []
+    for candidate in DATAMART_ROOT_CANDIDATES:
+        if candidate and candidate not in roots:
+            roots.append(candidate.rstrip("/"))
+    if not roots:
+        roots.append("datamart")
+    return roots
+
+
+def get_model_store_roots():
+    """Return ordered list of candidate model store roots (deduplicated)."""
+    roots = []
+    for candidate in MODEL_STORE_ROOT_CANDIDATES:
+        if candidate and candidate not in roots:
+            roots.append(candidate.rstrip("/"))
+    if not roots:
+        roots.append("model_store")
+    return roots
+
+
+def resolve_datamart_path(relative_path, expect_directory=False):
+    """Find the first matching datamart path for given relative path."""
+    attempted = []
+    for root in get_datamart_roots():
+        candidate = os.path.join(root, relative_path)
+        attempted.append(candidate)
+        if expect_directory and os.path.isdir(candidate):
+            return candidate, root, attempted
+        if not expect_directory and os.path.exists(candidate):
+            return candidate, root, attempted
+    return None, None, attempted
+
+
+def resolve_model_store_path(relative_path, expect_directory=False):
+    """Find the first matching model store path for given relative path."""
+    attempted = []
+    for root in get_model_store_roots():
+        candidate = os.path.join(root, relative_path)
+        attempted.append(candidate)
+        if expect_directory and os.path.isdir(candidate):
+            return candidate, root, attempted
+        if not expect_directory and os.path.exists(candidate):
+            return candidate, root, attempted
+    return None, None, attempted
+
+
+def load_model_artifacts(model_store_dir="model_1/"):
     """Load trained model, preprocessing pipeline, and feature list"""
 
-    if not os.path.exists(model_store_dir):
+    # Resolve model store directory path
+    resolved_dir, root, attempted = resolve_model_store_path(model_store_dir, expect_directory=True)
+
+    if not resolved_dir:
+        print("⚠️  Model store directory not found in any candidate location:")
+        for path in attempted:
+            print(f"   - {path}")
         raise FileNotFoundError(f"Model store directory not found: {model_store_dir}")
+
+    model_store_dir = resolved_dir
+    print(f"✓ Found model store: {model_store_dir}")
 
     # Load model
     model_path = os.path.join(model_store_dir, "model.pkl")
@@ -62,15 +133,20 @@ def load_model_artifacts(model_store_dir="model_store/model_1/"):
 def load_inference_data(snapshot_date_str, spark, feature_cols):
     """Load feature data for inference from gold feature store"""
 
-    gold_feature_dir = "datamart/gold/feature_store/"
+    gold_feature_dir = "gold/feature_store/"
 
     # Build path for the specific snapshot date
     date_obj = datetime.strptime(snapshot_date_str, "%Y-%m-%d")
     file_date_str = date_obj.strftime("%Y_%m_%d")
-    feature_file = f"{gold_feature_dir}gold_feature_store_{file_date_str}.parquet"
+    relative_path = os.path.join(gold_feature_dir, f"gold_feature_store_{file_date_str}.parquet")
 
-    if not os.path.exists(feature_file):
-        raise FileNotFoundError(f"Feature file not found: {feature_file}")
+    feature_file, datamart_root, attempted = resolve_datamart_path(relative_path)
+
+    if not feature_file:
+        print("⚠️  Feature file not found in any candidate datamart root:")
+        for path in attempted:
+            print(f"   - {path}")
+        raise FileNotFoundError(f"Feature file not found: {relative_path}")
 
     print(f"\nLoading inference data from: {feature_file}")
     df_features = spark.read.parquet(feature_file)
@@ -148,7 +224,14 @@ def generate_predictions(model, preprocessing, df_features, feature_cols):
 def save_predictions(results_pdf, snapshot_date_str, spark):
     """Save predictions to gold predictions table"""
 
-    predictions_dir = "datamart/gold/predictions/"
+    predictions_subdir = "gold/predictions/"
+
+    # Try to find existing predictions directory or use first datamart root
+    base_root = resolve_datamart_path(predictions_subdir, expect_directory=True)[1]
+    if base_root is None:
+        base_root = get_datamart_roots()[0]
+
+    predictions_dir = os.path.join(base_root, predictions_subdir)
 
     if not os.path.exists(predictions_dir):
         os.makedirs(predictions_dir)
@@ -179,8 +262,8 @@ def main():
     parser = argparse.ArgumentParser(description='Model 1 Inference: Generate predictions using trained Logistic Regression')
     parser.add_argument('--snapshotdate', type=str, required=True,
                         help='Snapshot date for inference (YYYY-MM-DD)')
-    parser.add_argument('--model_store', type=str, default='model_store/model_1/',
-                        help='Path to model store directory')
+    parser.add_argument('--model_store', type=str, default='model_1/',
+                        help='Path to model store directory (relative to model_store root)')
 
     args = parser.parse_args()
     snapshotdate = args.snapshotdate

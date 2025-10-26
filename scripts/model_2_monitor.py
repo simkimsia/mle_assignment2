@@ -24,6 +24,38 @@ warnings.filterwarnings("ignore")
 # Input: Predictions + labels (ground truth)
 # Output: datamart/gold/monitoring/model_2_metrics_YYYY_MM_DD.parquet
 
+DATAMART_ROOT_ENV_VAR = "DATAMART_ROOT"
+DATAMART_ROOT_CANDIDATES = [
+    os.environ.get(DATAMART_ROOT_ENV_VAR),
+    "datamart",
+    "scripts/datamart",
+    "/opt/airflow/scripts/datamart",
+]
+
+
+def get_datamart_roots():
+    """Return ordered list of candidate datamart roots (deduplicated)."""
+    roots = []
+    for candidate in DATAMART_ROOT_CANDIDATES:
+        if candidate and candidate not in roots:
+            roots.append(candidate.rstrip("/"))
+    if not roots:
+        roots.append("datamart")
+    return roots
+
+
+def resolve_datamart_path(relative_path, expect_directory=False):
+    """Find the first matching datamart path for given relative path."""
+    attempted = []
+    for root in get_datamart_roots():
+        candidate = os.path.join(root, relative_path)
+        attempted.append(candidate)
+        if expect_directory and os.path.isdir(candidate):
+            return candidate, root, attempted
+        if not expect_directory and os.path.exists(candidate):
+            return candidate, root, attempted
+    return None, None, attempted
+
 
 def load_predictions(snapshot_date_str, spark):
     """Load predictions from gold predictions table
@@ -35,7 +67,7 @@ def load_predictions(snapshot_date_str, spark):
     """
     from dateutil.relativedelta import relativedelta
 
-    predictions_dir = "datamart/gold/predictions/"
+    predictions_dir = "gold/predictions/"
 
     # Calculate prediction date: 6 months before snapshot date
     # This ensures we get predictions for loans that are now at mob=6
@@ -44,10 +76,13 @@ def load_predictions(snapshot_date_str, spark):
     prediction_date_str = prediction_date_obj.strftime("%Y-%m-%d")
     file_date_str = prediction_date_obj.strftime("%Y_%m_%d")
 
-    predictions_file = f"{predictions_dir}model_2_predictions_{file_date_str}.parquet"
+    relative_path = os.path.join(predictions_dir, f"model_2_predictions_{file_date_str}.parquet")
+    predictions_file, datamart_root, attempted = resolve_datamart_path(relative_path)
 
-    if not os.path.exists(predictions_file):
-        print(f"⚠️  Predictions file not found: {predictions_file}")
+    if not predictions_file:
+        print(f"⚠️  Predictions file not found in any candidate datamart root:")
+        for path in attempted:
+            print(f"   - {path}")
         print(
             "   This is expected for snapshot dates within 6 months of pipeline start."
         )
@@ -55,7 +90,7 @@ def load_predictions(snapshot_date_str, spark):
         print(
             f"   Need predictions from {prediction_date_str} to match labels from {snapshot_date_str}"
         )
-        raise FileNotFoundError(f"Predictions file not found: {predictions_file}")
+        raise FileNotFoundError(f"Predictions file not found: {relative_path}")
 
     print(f"\nLoading predictions from: {predictions_file}")
     print(f"  Prediction date (mob=0): {prediction_date_str}")
@@ -72,15 +107,20 @@ def load_predictions(snapshot_date_str, spark):
 def load_labels(snapshot_date_str, spark):
     """Load ground truth labels from gold label store"""
 
-    label_store_dir = "datamart/gold/label_store/"
+    label_store_dir = "gold/label_store/"
 
     # Build path for the specific snapshot date
     date_obj = datetime.strptime(snapshot_date_str, "%Y-%m-%d")
     file_date_str = date_obj.strftime("%Y_%m_%d")
-    label_file = f"{label_store_dir}gold_label_store_{file_date_str}.parquet"
+    relative_path = os.path.join(label_store_dir, f"gold_label_store_{file_date_str}.parquet")
 
-    if not os.path.exists(label_file):
-        raise FileNotFoundError(f"Label file not found: {label_file}")
+    label_file, datamart_root, attempted = resolve_datamart_path(relative_path)
+
+    if not label_file:
+        print("⚠️  Label file not found in any candidate datamart root:")
+        for path in attempted:
+            print(f"   - {path}")
+        raise FileNotFoundError(f"Label file not found: {relative_path}")
 
     print(f"\nLoading labels from: {label_file}")
     df_labels = spark.read.parquet(label_file)
@@ -234,7 +274,14 @@ def calculate_metrics(df_joined):
 def save_metrics(metrics, snapshot_date_str, spark):
     """Save monitoring metrics to gold monitoring table"""
 
-    monitoring_dir = "datamart/gold/monitoring/"
+    monitoring_subdir = "gold/monitoring/"
+
+    # Try to find existing monitoring directory or use first datamart root
+    base_root = resolve_datamart_path(monitoring_subdir, expect_directory=True)[1]
+    if base_root is None:
+        base_root = get_datamart_roots()[0]
+
+    monitoring_dir = os.path.join(base_root, monitoring_subdir)
 
     if not os.path.exists(monitoring_dir):
         os.makedirs(monitoring_dir)
