@@ -35,6 +35,26 @@ print_error() {
     echo -e "${RED}✗${NC} $1"
 }
 
+cleanup_bronze_silver() {
+    print_header "Cleaning: Bronze and Silver Layers ONLY"
+
+    # Clean bronze layer
+    if [ -d "$SCRIPT_DIR/datamart/bronze" ]; then
+        rm -rf "$SCRIPT_DIR/datamart/bronze"/*
+        print_info "Removed bronze layer data"
+    else
+        print_warning "Bronze directory doesn't exist yet"
+    fi
+
+    # Clean silver layer
+    if [ -d "$SCRIPT_DIR/datamart/silver" ]; then
+        rm -rf "$SCRIPT_DIR/datamart/silver"/*
+        print_info "Removed silver layer data"
+    else
+        print_warning "Silver directory doesn't exist yet"
+    fi
+}
+
 cleanup_monitoring() {
     print_header "Cleaning: Model Monitoring Outputs"
 
@@ -142,17 +162,19 @@ show_usage() {
     echo "Usage: ./cleanup.sh [stage]"
     echo ""
     echo "Stages (with automatic downstream cleanup):"
-    echo "  ${GREEN}datamart${NC}    - Clean bronze/silver/gold data + training + inference + monitoring"
-    echo "  ${GREEN}training${NC}    - Clean model artifacts + inference + monitoring"
-    echo "  ${GREEN}inference${NC}   - Clean predictions + monitoring"
-    echo "  ${GREEN}monitoring${NC}  - Clean monitoring metrics only"
-    echo "  ${GREEN}all${NC}         - Clean everything (same as datamart)"
+    echo "  ${GREEN}bronze-silver${NC} - Clean ONLY bronze/silver layers (no downstream impact)"
+    echo "  ${GREEN}datamart${NC}      - Clean bronze/silver/gold data + training + inference + monitoring"
+    echo "  ${GREEN}training${NC}      - Clean model artifacts + inference + monitoring"
+    echo "  ${GREEN}inference${NC}     - Clean predictions + monitoring"
+    echo "  ${GREEN}monitoring${NC}    - Clean monitoring metrics only"
+    echo "  ${GREEN}all${NC}           - Clean everything (same as datamart)"
     echo ""
     echo "Examples:"
-    echo "  ./cleanup.sh datamart    # Changed feature engineering? Clean datamart"
-    echo "  ./cleanup.sh training    # Changed model hyperparameters? Clean training"
-    echo "  ./cleanup.sh inference   # Changed inference logic? Clean inference"
-    echo "  ./cleanup.sh monitoring  # Changed monitoring metrics? Clean monitoring"
+    echo "  ./cleanup.sh bronze-silver  # Changed raw data processing? Clean bronze/silver only"
+    echo "  ./cleanup.sh datamart       # Changed feature engineering? Clean datamart"
+    echo "  ./cleanup.sh training       # Changed model hyperparameters? Clean training"
+    echo "  ./cleanup.sh inference      # Changed inference logic? Clean inference"
+    echo "  ./cleanup.sh monitoring     # Changed monitoring metrics? Clean monitoring"
     echo ""
 }
 
@@ -179,6 +201,10 @@ fi
 STAGE=$1
 
 case $STAGE in
+    bronze-silver)
+        confirm_cleanup "bronze and silver layers only"
+        cleanup_bronze_silver
+        ;;
     monitoring)
         confirm_cleanup "monitoring only"
         cleanup_monitoring
