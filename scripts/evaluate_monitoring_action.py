@@ -13,10 +13,12 @@ warnings.filterwarnings("ignore")
 # Input: Monitoring metrics (JSON) + Threshold config (JSON)
 # Output: Action recommendation (monitor / active_monitoring / retrain) + detailed report
 
-MONITORING_DIR_CANDIDATES = [
-    "datamart/gold/monitoring",
-    "scripts/datamart/gold/monitoring",
-    "/opt/airflow/scripts/datamart/gold/monitoring",
+DATAMART_ROOT_ENV_VAR = "DATAMART_ROOT"
+DATAMART_ROOT_CANDIDATES = [
+    os.environ.get(DATAMART_ROOT_ENV_VAR),
+    "datamart",
+    "scripts/datamart",
+    "/opt/airflow/scripts/datamart",
 ]
 
 THRESHOLD_CONFIG_CANDIDATES = [
@@ -31,16 +33,60 @@ MODEL_STORE_CANDIDATES = [
     "/opt/airflow/scripts/model_store",
 ]
 
+OUTPUT_DIR_CANDIDATES = [
+    "outputs/actions",
+    "scripts/outputs/actions",
+    "/opt/airflow/scripts/outputs/actions",
+]
 
-def find_file(candidates: List[str], file_type: str) -> Optional[str]:
-    """Find the first existing file from a list of candidates."""
-    for candidate in candidates:
+
+def get_datamart_roots():
+    """Return ordered list of candidate datamart roots (deduplicated)."""
+    roots = []
+    for candidate in DATAMART_ROOT_CANDIDATES:
+        if candidate and candidate not in roots:
+            roots.append(candidate.rstrip("/"))
+    if not roots:
+        roots.append("datamart")
+    return roots
+
+
+def find_monitoring_dir():
+    """Find the monitoring directory containing JSON metrics."""
+    for root in get_datamart_roots():
+        monitoring_dir = os.path.join(root, "gold/monitoring")
+        if os.path.isdir(monitoring_dir):
+            return monitoring_dir
+    return None
+
+
+def find_model_store_dir():
+    """Find the model store directory containing trained model metadata."""
+    for candidate in MODEL_STORE_CANDIDATES:
+        if os.path.isdir(candidate):
+            return candidate
+    return None
+
+
+def find_threshold_config():
+    """Find the threshold configuration file."""
+    for candidate in THRESHOLD_CONFIG_CANDIDATES:
         if os.path.exists(candidate):
             return candidate
-    print(f"⚠️  Warning: {file_type} not found in candidates:")
-    for c in candidates:
-        print(f"     - {c}")
     return None
+
+
+def get_output_dir():
+    """Get or create output directory for action decisions."""
+    for candidate in OUTPUT_DIR_CANDIDATES:
+        parent = os.path.dirname(candidate)
+        if parent and os.path.isdir(parent):
+            os.makedirs(candidate, exist_ok=True)
+            return candidate
+    # Fallback: create in current directory
+    output_dir = "outputs/actions"
+    os.makedirs(output_dir, exist_ok=True)
+    return output_dir
 
 
 def load_threshold_config(config_path: str) -> Dict:
@@ -318,10 +364,9 @@ def save_action_decision(
     action_alerts: List[str],
     metric_evaluations: List[Dict],
     metrics: Dict,
-    output_dir: str = "outputs/actions"
+    output_dir: str
 ) -> str:
     """Save action decision to JSON file for downstream processing."""
-    os.makedirs(output_dir, exist_ok=True)
 
     snapshot_date = metrics.get('snapshot_date', datetime.now().strftime('%Y-%m-%d'))
     date_str = snapshot_date.replace('-', '_')
@@ -379,8 +424,7 @@ def main():
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="outputs/actions",
-        help="Output directory for action decisions (default: outputs/actions)"
+        help="Output directory for action decisions (auto-created if not provided)"
     )
 
     args = parser.parse_args()
@@ -395,9 +439,13 @@ def main():
         if args.threshold_config:
             threshold_config_path = args.threshold_config
         else:
-            threshold_config_path = find_file(THRESHOLD_CONFIG_CANDIDATES, "Threshold config")
+            threshold_config_path = find_threshold_config()
 
         if not threshold_config_path:
+            print("\n❌ Error: Threshold configuration not found")
+            print("   Searched locations:")
+            for candidate in THRESHOLD_CONFIG_CANDIDATES:
+                print(f"     - {candidate}")
             raise FileNotFoundError("Threshold configuration not found")
 
         threshold_config = load_threshold_config(threshold_config_path)
@@ -406,9 +454,16 @@ def main():
         if args.monitoring_dir:
             monitoring_dir = args.monitoring_dir
         else:
-            monitoring_dir = find_file(MONITORING_DIR_CANDIDATES, "Monitoring directory")
+            monitoring_dir = find_monitoring_dir()
 
-        if not monitoring_dir:
+        if not monitoring_dir or not os.path.isdir(monitoring_dir):
+            print("\n❌ Error: Monitoring directory not found")
+            if monitoring_dir:
+                print(f"   Searched: {monitoring_dir}")
+            else:
+                print("   Searched locations:")
+                for root in get_datamart_roots():
+                    print(f"     - {os.path.join(root, 'gold/monitoring')}")
             raise FileNotFoundError("Monitoring directory not found")
 
         # Load latest monitoring metrics
@@ -427,7 +482,7 @@ def main():
         if args.model_store_dir:
             model_store_dir = args.model_store_dir
         else:
-            model_store_dir = find_file(MODEL_STORE_CANDIDATES, "Model store")
+            model_store_dir = find_model_store_dir()
 
         if model_store_dir:
             print(f"\n{'='*60}")
@@ -437,6 +492,8 @@ def main():
             if baseline_metrics:
                 print(f"OOT ROC-AUC: {baseline_metrics.get('oot_roc_auc', 'N/A')}")
                 print(f"OOT Accuracy: {baseline_metrics.get('oot_accuracy', 'N/A')}")
+        else:
+            print(f"\n⚠️  Model store not found. Baseline comparison will be skipped.")
 
         # Evaluate each metric
         print(f"\n{'='*60}")
@@ -498,6 +555,15 @@ def main():
             metrics_file=metrics_file
         )
 
+        # Get output directory
+        if args.output_dir:
+            output_dir = args.output_dir
+            os.makedirs(output_dir, exist_ok=True)
+        else:
+            output_dir = get_output_dir()
+
+        print(f"\nOutput directory: {output_dir}")
+
         # Save action decision
         decision_file = save_action_decision(
             model_id=args.model_id,
@@ -505,7 +571,7 @@ def main():
             action_alerts=action_alerts,
             metric_evaluations=metric_evaluations,
             metrics=metrics,
-            output_dir=args.output_dir
+            output_dir=output_dir
         )
 
         # Save report
