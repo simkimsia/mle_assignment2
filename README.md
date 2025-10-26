@@ -106,7 +106,7 @@ Visualization & Action Evaluation
 - **Conditional Execution**: Smart task skipping based on data availability
 - **Performance Monitoring**: Automated metric tracking with threshold-based alerting
 - **Visualization**: Automated chart generation for model performance trends
-- **Action Evaluation**: Threshold-based recommendation system (MONITOR/RETRAIN/INVESTIGATE)
+- **Action Evaluation**: 3-tier governance system (monitor/active_monitoring/retrain)
 
 ---
 
@@ -593,14 +593,18 @@ scripts/datamart/
 ### Output Data
 
 ```
-outputs/
-├── visuals/             # Charts and dashboards
-│   ├── model_1_performance_trends.png
-│   ├── model_2_performance_trends.png
-│   └── monitoring_dashboard.html
-└── actions/             # Action evaluation reports
-    ├── model_1_action_2024_12_01.json
-    └── model_1_action_2024_12_01.txt
+scripts/outputs/
+├── visuals/             # Performance visualization charts and reports
+│   ├── performance_metrics_over_time.png          # ROC-AUC, Accuracy, F1 trends
+│   ├── confusion_matrix_comparison.png             # Model 1 vs Model 2 confusion matrices
+│   ├── prediction_distribution_stability.png       # Prediction probability distributions
+│   ├── model_comparison_summary.png                # Side-by-side metric comparison dashboard
+│   └── monitoring_summary_report.txt               # Text summary of all metrics and trends
+└── actions/             # Action evaluation reports (monitor/active_monitoring/retrain)
+    ├── model_1_action_2024_12_01.json              # Machine-readable decision for Model 1
+    ├── model_1_action_2024_12_01.txt               # Human-readable report for Model 1
+    ├── model_2_action_2024_12_01.json              # Machine-readable decision for Model 2
+    └── model_2_action_2024_12_01.txt               # Human-readable report for Model 2
 ```
 
 ---
@@ -635,13 +639,46 @@ See [MODEL_GOVERNANCE_SOP.md](./MODEL_GOVERNANCE_SOP.md) for deployment architec
 
 ### Monitoring & Alerting
 
-Three action levels based on threshold breaches:
+The monitoring system uses a **3-tier action framework** with dual thresholds and priority levels:
 
-1. **MONITOR** (Green): All metrics healthy, continue monthly monitoring
-2. **ACTIVE MONITORING** (Yellow): Metrics below DS threshold, increase monitoring frequency
-3. **RETRAIN** (Red): Metrics below business threshold, immediate retraining required
+#### Dual Threshold Philosophy
 
-Thresholds configured in `scripts/monitoring_thresholds.json`.
+- **Business Threshold**: Minimum acceptable performance for business operations
+  - ROC-AUC ≥ 0.75, Accuracy ≥ 0.70
+- **Data Science Threshold**: Early warning buffer (set higher than business thresholds)
+  - ROC-AUC ≥ 0.80, Accuracy ≥ 0.75
+- **Purpose**: Enable proactive intervention before reaching critical levels
+
+#### Priority Levels
+
+Metrics are prioritized based on business impact:
+
+- **P0**: Critical business metrics (ROC-AUC) - directly impacts credit decisions
+- **P1**: Important business metrics (Accuracy) - affects operational efficiency
+- **P2**: Data Science operational metrics (F1-Score) - technical health indicators
+- **P3**: Data Science diagnostic metrics (Precision, Recall) - detailed analysis
+
+#### Three Action Levels
+
+Action determination is based on P0 and P1 metric performance:
+
+1. **monitor** (Green): All P0/P1 metrics above DS thresholds
+   - Action: Continue normal monthly monitoring
+   - Notification: Monthly email report (informational)
+
+2. **active_monitoring** (Yellow): Any P0/P1 metric below DS threshold but above business threshold
+   - Action: Weekly monitoring, investigate root cause, prepare retraining plan
+   - Notification: Slack alert + Email to ML team
+   - Example: 0.75 ≤ ROC-AUC < 0.80
+
+3. **retrain** (Red): Any P0/P1 metric below business threshold
+   - Action: Immediate retraining required within 1 week
+   - Notification: PagerDuty alert + Slack + Email (ML team + Risk team)
+   - Example: ROC-AUC < 0.75
+
+**Configuration:** Thresholds defined in `scripts/monitoring_thresholds.json`
+
+**Evaluation Script:** `scripts/evaluate_monitoring_action.py` generates detailed action reports in `scripts/outputs/actions/`
 
 ---
 

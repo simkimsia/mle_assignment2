@@ -16,6 +16,7 @@ This document explains all the tasks (nodes) in the Airflow DAG and their purpos
 This pipeline processes loan data to create labels for ML model training.
 
 ### `dep_check_source_label_data`
+
 - **Type:** DummyOperator
 - **Purpose:** Dependency checkpoint to ensure source data is ready
 - **Input:** None (checkpoint only)
@@ -23,6 +24,7 @@ This pipeline processes loan data to create labels for ML model training.
 - **Notes:** Placeholder for future data validation logic
 
 ### `run_bronze_label_store`
+
 - **Type:** BashOperator
 - **Script:** `bronze_label_store.py`
 - **Purpose:** Ingest raw loan management system (LMS) data
@@ -34,6 +36,7 @@ This pipeline processes loan data to create labels for ML model training.
   - Saves to bronze layer with minimal transformation
 
 ### `silver_label_store`
+
 - **Type:** BashOperator
 - **Script:** `silver_label_store.py`
 - **Purpose:** Clean and validate loan data
@@ -46,6 +49,7 @@ This pipeline processes loan data to create labels for ML model training.
   - Convert to Parquet format
 
 ### `gold_label_store`
+
 - **Type:** BashOperator
 - **Script:** `gold_label_store.py`
 - **Purpose:** Generate ML labels (target variable)
@@ -58,6 +62,7 @@ This pipeline processes loan data to create labels for ML model training.
   - Creates ML-ready label dataset
 
 ### `label_store_completed`
+
 - **Type:** DummyOperator
 - **Purpose:** Marker indicating label store pipeline completed
 - **Input:** None
@@ -73,11 +78,13 @@ This pipeline processes user feature data (attributes, financials, clickstream) 
 ### Bronze Layer - Data Ingestion
 
 #### `dep_check_source_data_bronze_1`
+
 - **Type:** DummyOperator
 - **Purpose:** Checkpoint for attributes data availability
 - **Notes:** Placeholder for future data validation
 
 #### `bronze_table_1`
+
 - **Type:** BashOperator
 - **Script:** `bronze_table_1.py`
 - **Purpose:** Ingest user attributes data
@@ -89,11 +96,13 @@ This pipeline processes user feature data (attributes, financials, clickstream) 
   - Saves raw data to bronze layer
 
 #### `dep_check_source_data_bronze_2`
+
 - **Type:** DummyOperator
 - **Purpose:** Checkpoint for financials data availability
 - **Notes:** Placeholder for future data validation
 
 #### `bronze_table_2`
+
 - **Type:** BashOperator
 - **Script:** `bronze_table_2.py`
 - **Purpose:** Ingest user financial data
@@ -106,11 +115,13 @@ This pipeline processes user feature data (attributes, financials, clickstream) 
   - Saves raw data to bronze layer
 
 #### `dep_check_source_data_bronze_3`
+
 - **Type:** DummyOperator
 - **Purpose:** Checkpoint for clickstream data availability
 - **Notes:** Placeholder for future data validation
 
 #### `bronze_table_3`
+
 - **Type:** BashOperator
 - **Script:** `bronze_table_3.py`
 - **Purpose:** Ingest user clickstream/interaction data
@@ -124,6 +135,7 @@ This pipeline processes user feature data (attributes, financials, clickstream) 
 ### Silver Layer - Data Cleaning & Transformation
 
 #### `silver_table_1`
+
 - **Type:** BashOperator
 - **Script:** `silver_table_1.py`
 - **Purpose:** Clean and transform attributes + financials data
@@ -141,6 +153,7 @@ This pipeline processes user feature data (attributes, financials, clickstream) 
   - Convert to Parquet format
 
 #### `silver_table_2`
+
 - **Type:** BashOperator
 - **Script:** `silver_table_2.py`
 - **Purpose:** Clean and transform clickstream data
@@ -155,6 +168,7 @@ This pipeline processes user feature data (attributes, financials, clickstream) 
 ### Gold Layer - Feature Store Assembly
 
 #### `gold_feature_store`
+
 - **Type:** BashOperator
 - **Script:** `gold_feature_store.py`
 - **Purpose:** Combine all features into ML-ready feature store
@@ -171,6 +185,7 @@ This pipeline processes user feature data (attributes, financials, clickstream) 
   - Generate ML-compatible schema
 
 #### `feature_store_completed`
+
 - **Type:** DummyOperator
 - **Purpose:** Marker indicating feature store pipeline completed
 - **Notes:** Triggers downstream ML tasks
@@ -183,6 +198,7 @@ This pipeline processes user feature data (attributes, financials, clickstream) 
 **Purpose:** Use trained models to generate predictions
 
 ### `check_models_for_inference`
+
 - **Type:** ShortCircuitOperator
 - **Purpose:** Conditional check to ensure models exist before running inference
 - **Function:** `check_models_exist_for_inference()`
@@ -198,11 +214,13 @@ This pipeline processes user feature data (attributes, financials, clickstream) 
   - Subsequent runs use existing models immediately
 
 ### `model_inference_start`
+
 - **Type:** DummyOperator
 - **Purpose:** Start marker for inference pipeline
 - **Dependencies:** Waits for `feature_store_completed` → `check_models_for_inference`
 
 ### `model_1_inference`
+
 - **Type:** BashOperator
 - **Script:** `model_1_inference.py`
 - **Purpose:** Run inference with Model 1
@@ -217,6 +235,7 @@ This pipeline processes user feature data (attributes, financials, clickstream) 
   - Save predictions with user_id, prediction, probability
 
 ### `model_2_inference`
+
 - **Type:** BashOperator
 - **Script:** `model_2_inference.py`
 - **Purpose:** Run inference with Model 2
@@ -231,6 +250,7 @@ This pipeline processes user feature data (attributes, financials, clickstream) 
   - Save predictions with user_id, prediction, probability
 
 ### `model_inference_completed`
+
 - **Type:** DummyOperator
 - **Purpose:** End marker for inference pipeline
 - **Notes:** Triggers monitoring pipeline
@@ -243,6 +263,7 @@ This pipeline processes user feature data (attributes, financials, clickstream) 
 **Purpose:** Monitor model performance and stability over time
 
 ### `check_inference_for_monitoring`
+
 - **Type:** ShortCircuitOperator
 - **Purpose:** Conditional check to ensure required predictions exist before monitoring
 - **Function:** `check_inference_completed_for_monitoring()`
@@ -261,11 +282,13 @@ This pipeline processes user feature data (attributes, financials, clickstream) 
   - Example: For labels on 2024-12-01, needs predictions from 2024-06-01
 
 ### `model_monitor_start`
+
 - **Type:** DummyOperator
 - **Purpose:** Start marker for monitoring pipeline
 - **Dependencies:** Waits for `model_inference_completed` → `check_inference_for_monitoring`
 
 ### `model_1_monitor`
+
 - **Type:** BashOperator
 - **Script:** `model_1_monitor.py`
 - **Purpose:** Monitor Model 1 performance
@@ -286,6 +309,7 @@ This pipeline processes user feature data (attributes, financials, clickstream) 
   - Save metrics to monitoring store
 
 ### `model_2_monitor`
+
 - **Type:** BashOperator
 - **Script:** `model_2_monitor.py`
 - **Purpose:** Monitor Model 2 performance
@@ -296,6 +320,7 @@ This pipeline processes user feature data (attributes, financials, clickstream) 
 - **Metrics Calculated:** Same as Model 1
 
 ### `model_monitor_completed`
+
 - **Type:** DummyOperator
 - **Purpose:** End marker for monitoring pipeline
 - **Notes:** Triggers visualization pipeline
@@ -308,6 +333,7 @@ This pipeline processes user feature data (attributes, financials, clickstream) 
 **Purpose:** Generate visual reports and charts for model monitoring metrics
 
 ### `visualize_monitoring`
+
 - **Type:** BashOperator
 - **Script:** `visualize_monitoring.py`
 - **Purpose:** Create performance visualization charts and reports
@@ -335,31 +361,80 @@ This pipeline processes user feature data (attributes, financials, clickstream) 
 **Purpose:** Evaluate monitoring metrics against thresholds to determine required actions
 
 ### `evaluate_monitoring_actions`
+
 - **Type:** BashOperator
 - **Script:** `evaluate_monitoring_action.py`
-- **Purpose:** Assess model performance and recommend actions
+- **Purpose:** Assess model performance and recommend actions using 3-tier governance framework
 - **Input:**
   - `datamart/gold/monitoring/model_1_metrics_*.parquet`
   - `datamart/gold/monitoring/model_2_metrics_*.parquet`
-  - Threshold configuration (hardcoded or from config file)
+  - `scripts/monitoring_thresholds.json` (threshold configuration)
+  - `scripts/model_store/model_X/metadata.json` (baseline metrics)
 - **Output:**
-  - Action recommendations (Continue, Retrain, Investigate)
-  - Alert logs if thresholds exceeded
-  - Decision audit trail
+  - `scripts/outputs/actions/model_X_action_YYYY_MM_DD.json` (machine-readable decision)
+  - `scripts/outputs/actions/model_X_action_YYYY_MM_DD.txt` (human-readable report)
 - **Trigger Rule:** `all_success` - only runs if visualization succeeds
-- **Evaluation Logic:**
-  - Checks ROC-AUC against minimum threshold
-  - Checks PSI against maximum drift threshold
-  - Compares current vs baseline performance
-  - Generates actionable recommendations
-- **Actions:**
-  - **Continue:** Model performance acceptable
-  - **Retrain:** Performance degraded, trigger retraining
-  - **Investigate:** Drift detected, manual review needed
-- **Processing:**
-  - Run separately for Model 1 and Model 2
-  - Executed sequentially via: `python3 evaluate_monitoring_action.py --model-id model_1 && python3 evaluate_monitoring_action.py --model-id model_2`
-- **Notes:** Could trigger automated retraining in future iterations
+
+### Dual Threshold Philosophy
+
+The action evaluation uses **two threshold levels** for each metric:
+
+- **Business Threshold:** Minimum acceptable performance for business operations (ROC-AUC ≥ 0.75, Accuracy ≥ 0.70)
+- **Data Science Threshold:** Early warning buffer set higher than business thresholds (ROC-AUC ≥ 0.80, Accuracy ≥ 0.75)
+- **Purpose:** Enable proactive intervention before reaching critical levels
+
+### Priority Levels
+
+Metrics are prioritized based on business impact:
+
+- **P0:** Critical business metrics (ROC-AUC) - directly impacts credit decisions
+- **P1:** Important business metrics (Accuracy) - affects operational efficiency
+- **P2:** Data Science operational metrics (F1-Score) - technical health indicators
+- **P3:** Data Science diagnostic metrics (Precision, Recall) - detailed analysis
+
+### Action Determination Logic
+
+Three action levels based on P0 and P1 metric performance:
+
+#### 1. **monitor** (Green)
+
+- **Trigger:** All P0 and P1 metrics above data science thresholds
+- **Action Required:** Continue normal monthly monitoring cycle
+- **Notification:** Monthly email report to ML team (informational)
+- **Example:** ROC-AUC ≥ 0.80, Accuracy ≥ 0.75
+
+#### 2. **active_monitoring** (Yellow)
+
+- **Trigger:** Any P0 or P1 metric below data science threshold but above business threshold
+- **Action Required:**
+  - Increase monitoring frequency (weekly instead of monthly)
+  - Investigate root cause (data drift, feature quality, population shift)
+  - Prepare retraining plan as contingency
+  - Set up additional alerting for further degradation
+- **Notification:** Slack alert + Email to ML team
+- **Example:** 0.75 ≤ ROC-AUC < 0.80 or 0.70 ≤ Accuracy < 0.75
+
+#### 3. **retrain** (Red)
+
+- **Trigger:** Any P0 or P1 metric below business threshold
+- **Action Required:**
+  - Initiate emergency retraining workflow immediately
+  - Investigate root cause (data quality, model drift, label issues)
+  - Notify all stakeholders (Risk team, Product team)
+  - Schedule retraining to complete within 1 week
+  - Prepare rollback plan
+- **Notification:** PagerDuty alert + Slack + Email (ML team + Risk team)
+- **Example:** ROC-AUC < 0.75 or Accuracy < 0.70
+
+### Processing
+
+- Run separately for Model 1 and Model 2
+- Executed sequentially via: `python3 evaluate_monitoring_action.py --model-id model_1 && python3 evaluate_monitoring_action.py --model-id model_2`
+- Compares current metrics against thresholds
+- Compares current metrics against OOT baseline (for degradation detection)
+- Generates detailed report with recommended next steps
+
+**Notes:** Could trigger automated retraining in future iterations; currently outputs action decision for manual review
 
 ---
 
@@ -369,6 +444,7 @@ This pipeline processes user feature data (attributes, financials, clickstream) 
 **Purpose:** Automatically train and retrain models with temporal validation
 
 ### `check_training_data`
+
 - **Type:** ShortCircuitOperator
 - **Purpose:** Conditional check to ensure sufficient data exists before training
 - **Function:** `check_sufficient_data_for_training()`
@@ -395,11 +471,13 @@ This pipeline processes user feature data (attributes, financials, clickstream) 
   - Subsequent runs enable continuous model improvement
 
 ### `model_automl_start`
+
 - **Type:** DummyOperator
 - **Purpose:** Start marker for AutoML pipeline
 - **Dependencies:** Waits for both `feature_store_completed` AND `label_store_completed` → `check_training_data`
 
 ### `model_1_automl`
+
 - **Type:** BashOperator
 - **Script:** `model_1_automl_v2.py`
 - **Config:** `model_config.json`
@@ -428,6 +506,7 @@ This pipeline processes user feature data (attributes, financials, clickstream) 
   - **OOT:** Future data for temporal validation
 
 ### `model_2_automl`
+
 - **Type:** BashOperator
 - **Script:** `model_2_automl_v2.py`
 - **Config:** `model_config.json`
@@ -442,11 +521,13 @@ This pipeline processes user feature data (attributes, financials, clickstream) 
 - **Notes:** Runs in parallel with Model 1 training
 
 ### `model_automl_completed`
+
 - **Type:** DummyOperator
 - **Purpose:** End marker for AutoML pipeline
 - **Notes:** Triggers seed inference backfill
 
 ### `seed_inference_backfill`
+
 - **Type:** BashOperator
 - **Script:** `seed_inference_backfill.py`
 - **Purpose:** Generate predictions for past 8 months after initial model training
@@ -475,7 +556,8 @@ This pipeline processes user feature data (attributes, financials, clickstream) 
 
 ## 🔗 Pipeline Dependencies
 
-### Parallel Execution Groups:
+### Parallel Execution Groups
+
 1. **Bronze Feature Tables** (run in parallel):
    - `bronze_table_1` (attributes)
    - `bronze_table_2` (financials)
@@ -497,7 +579,8 @@ This pipeline processes user feature data (attributes, financials, clickstream) 
    - **Inference Branch:** `feature_store_completed` → `check_models_for_inference` → inference tasks
    - **Training Branch:** `[feature_store_completed + label_store_completed]` → `check_training_data` → training tasks
 
-### Sequential Dependencies:
+### Sequential Dependencies
+
 1. **Label Store Pipeline:**
    - `dep_check_source_label_data` → `bronze_label_store` → `silver_label_store` → `gold_label_store` → `label_store_completed`
 
@@ -524,7 +607,8 @@ This pipeline processes user feature data (attributes, financials, clickstream) 
    - `model_automl_start` → [`model_1_automl`, `model_2_automl`] → `model_automl_completed`
    - `model_automl_completed` → `seed_inference_backfill`
 
-### Conditional Execution (ShortCircuitOperators):
+### Conditional Execution (ShortCircuitOperators)
+
 - **`check_models_for_inference`:**
   - Skips inference if models don't exist
   - Expected on first run (2024-12-01) before training completes
@@ -537,14 +621,17 @@ This pipeline processes user feature data (attributes, financials, clickstream) 
   - Skips training if `execution_date < 2024-12-01`
   - Ensures minimum 23 months of data available
 
-### Critical Path:
+### Critical Path
+
 The critical path for full pipeline execution (once all conditions are met):
+
 ```
 Label Store → Training → Seed Backfill
 Feature Store → Inference → Monitoring → Visualization → Action Evaluation
 ```
 
-### First Run Behavior (2024-12-01):
+### First Run Behavior (2024-12-01)
+
 1. Label Store + Feature Store execute successfully
 2. Training executes (condition met: execution_date >= 2024-12-01)
 3. Inference **SKIPS** (models don't exist yet)
@@ -552,7 +639,8 @@ Feature Store → Inference → Monitoring → Visualization → Action Evaluati
 5. Seed backfill creates historical predictions after training
 6. Next run (2025-01-01): Inference starts working, Monitoring still waits
 
-### Steady State Behavior (2025-07-01+):
+### Steady State Behavior (2025-07-01+)
+
 1. All data pipelines execute
 2. Inference runs using existing models
 3. Monitoring runs (has predictions from 6 months ago)
@@ -627,21 +715,24 @@ Outputs (scripts/outputs/) - Visualizations & reports
 | Action Evaluation | ✅ Implemented | 1 script | Threshold-based alerting |
 | Model AutoML | ✅ Implemented | 3 scripts + 1 conditional + 1 backfill | 4-window validation, seed backfill |
 
-### Summary Statistics:
+### Summary Statistics
+
 - **Total Tasks:** 28 (13 operators, 15 script runners)
 - **ShortCircuitOperators:** 3 (conditional execution)
 - **BashOperators:** 15 (script execution)
 - **DummyOperators:** 10 (checkpoints & markers)
 - **Python Scripts:** 18 (data processing, ML training/inference)
 
-### Temporal Features:
+### Temporal Features
+
 - **Dynamic Windows:** Training windows calculated relative to snapshot_date
 - **6-Month Label Lag:** MOB=6 requirement for loan maturity
 - **6-Month Monitoring Lag:** Temporal alignment of predictions with labels
 - **8-Month Backfill:** Bootstrap prediction history for monitoring
 - **23-Month Minimum Data:** Required for initial training (12+2+2+1+6)
 
-### Execution Modes:
+### Execution Modes
+
 - **Catchup Mode:** Enabled (backfills all 24 months from 2023-01-01 to 2024-12-01)
 - **First Training:** 2024-12-01 (when 23 months of data available)
 - **First Monitoring:** 2025-07-01 (when 6 months of predictions exist)
