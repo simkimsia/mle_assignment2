@@ -254,8 +254,8 @@ scripts/datamart/silver
 scripts/datamart/bronze
 scripts/datamart/quarantine
 
-outputs/actions
-outputs/visuals
+scripts/outputs/actions
+scripts/outputs/visuals
 
 model_store/model_1
 model_store/model_2
