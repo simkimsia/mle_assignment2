@@ -302,6 +302,9 @@ with DAG(
     # --- model inference ---
 
     # Check if models exist before attempting inference
+    # NOTE: Runs in parallel with training. On first run (2024-12-01), inference skips
+    # because models don't exist yet. seed_inference_backfill handles this by creating
+    # predictions after training completes. Subsequent runs use existing models immediately.
     check_models_for_inference = ShortCircuitOperator(
         task_id="check_models_for_inference",
         python_callable=check_models_exist_for_inference,
@@ -381,7 +384,7 @@ with DAG(
     visualize_monitoring = BashOperator(
         task_id="visualize_monitoring",
         bash_command=("cd /opt/airflow/scripts && python3 visualize_monitoring.py"),
-        trigger_rule="all_done",  # Run even if monitoring has issues
+        trigger_rule="all_success",  # Only run if monitoring succeeds
     )
 
     # Visualization runs after monitoring (non-blocking)
@@ -397,7 +400,7 @@ with DAG(
             "python3 evaluate_monitoring_action.py --model-id model_1 && "
             "python3 evaluate_monitoring_action.py --model-id model_2"
         ),
-        trigger_rule="all_done",  # Run even if visualization has issues
+        trigger_rule="all_success",  # Only run if visualization succeeds
     )
 
     # Action evaluation runs after visualization

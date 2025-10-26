@@ -1,14 +1,15 @@
 import argparse
+import glob
 import json
 import os
-import glob
-from datetime import datetime
-import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-import seaborn as sns
-import numpy as np
 import warnings
+from datetime import datetime
+
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
 
 warnings.filterwarnings("ignore")
 
@@ -20,6 +21,7 @@ warnings.filterwarnings("ignore")
 DATAMART_ROOT_ENV_VAR = "DATAMART_ROOT"
 DATAMART_ROOT_CANDIDATES = [
     os.environ.get(DATAMART_ROOT_ENV_VAR),
+    "datamart",
     "scripts/datamart",
     "/opt/airflow/scripts/datamart",
 ]
@@ -80,46 +82,51 @@ def get_output_dir():
 
 def load_training_metadata(model_store_dir):
     """Load training metadata from model store for baseline comparison."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Loading Training Baseline Metrics")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"Model store directory: {model_store_dir}")
 
     training_baselines = {}
 
     # Find all model subdirectories
-    model_dirs = [d for d in os.listdir(model_store_dir)
-                  if os.path.isdir(os.path.join(model_store_dir, d)) and d.startswith('model_')]
+    model_dirs = [
+        d
+        for d in os.listdir(model_store_dir)
+        if os.path.isdir(os.path.join(model_store_dir, d)) and d.startswith("model_")
+    ]
 
     for model_dir in sorted(model_dirs):
-        metadata_path = os.path.join(model_store_dir, model_dir, 'metadata.json')
+        metadata_path = os.path.join(model_store_dir, model_dir, "metadata.json")
 
         if not os.path.exists(metadata_path):
             print(f"  ⚠️  No metadata found for {model_dir}")
             continue
 
-        with open(metadata_path, 'r') as f:
+        with open(metadata_path, "r") as f:
             metadata = json.load(f)
 
-        model_id = metadata.get('model_id', model_dir)
+        model_id = metadata.get("model_id", model_dir)
 
         # Extract training metrics
         baselines = {
-            'train_roc_auc': metadata.get('train_roc_auc'),
-            'val_roc_auc': metadata.get('val_roc_auc'),
-            'test_roc_auc': metadata.get('test_roc_auc'),
-            'oot_roc_auc': metadata.get('oot_roc_auc'),
-            'train_accuracy': metadata.get('train_accuracy'),
-            'val_accuracy': metadata.get('val_accuracy'),
-            'test_accuracy': metadata.get('test_accuracy'),
-            'oot_accuracy': metadata.get('oot_accuracy'),
-            'model_type': metadata.get('model_type', 'unknown'),
-            'training_date': metadata.get('training_date'),
+            "train_roc_auc": metadata.get("train_roc_auc"),
+            "val_roc_auc": metadata.get("val_roc_auc"),
+            "test_roc_auc": metadata.get("test_roc_auc"),
+            "oot_roc_auc": metadata.get("oot_roc_auc"),
+            "train_accuracy": metadata.get("train_accuracy"),
+            "val_accuracy": metadata.get("val_accuracy"),
+            "test_accuracy": metadata.get("test_accuracy"),
+            "oot_accuracy": metadata.get("oot_accuracy"),
+            "model_type": metadata.get("model_type", "unknown"),
+            "training_date": metadata.get("training_date"),
         }
 
         training_baselines[model_id] = baselines
         print(f"  ✓ Loaded baseline metrics for {model_id}")
-        print(f"     OOT ROC-AUC: {baselines['oot_roc_auc']:.4f}, Accuracy: {baselines['oot_accuracy']:.4f}")
+        print(
+            f"     OOT ROC-AUC: {baselines['oot_roc_auc']:.4f}, Accuracy: {baselines['oot_accuracy']:.4f}"
+        )
 
     print(f"\nLoaded baselines for {len(training_baselines)} models")
     return training_baselines
@@ -130,13 +137,11 @@ def load_monitoring_metrics(monitoring_dir):
     json_files = glob.glob(os.path.join(monitoring_dir, "*.json"))
 
     if not json_files:
-        raise FileNotFoundError(
-            f"No monitoring JSON files found in {monitoring_dir}"
-        )
+        raise FileNotFoundError(f"No monitoring JSON files found in {monitoring_dir}")
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Loading Monitoring Metrics")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"Monitoring directory: {monitoring_dir}")
     print(f"Found {len(json_files)} metric files")
 
@@ -166,9 +171,9 @@ def load_monitoring_metrics(monitoring_dir):
 
 def plot_performance_metrics_over_time(df, output_dir, training_baselines=None):
     """Plot primary performance metrics (ROC-AUC, Accuracy, F1) over time with training baseline references."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Generating Performance Metrics Over Time")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # Set style
     sns.set_style("whitegrid")
@@ -178,8 +183,24 @@ def plot_performance_metrics_over_time(df, output_dir, training_baselines=None):
 
     # Map monitoring metrics to training baseline keys
     metrics_to_plot = [
-        ("roc_auc", "ROC-AUC", 0.0, 1.0, "Primary Metric", "oot_roc_auc", "test_roc_auc"),
-        ("accuracy", "Accuracy", 0.0, 1.0, "Overall Correctness", "oot_accuracy", "test_accuracy"),
+        (
+            "roc_auc",
+            "ROC-AUC",
+            0.0,
+            1.0,
+            "Primary Metric",
+            "oot_roc_auc",
+            "test_roc_auc",
+        ),
+        (
+            "accuracy",
+            "Accuracy",
+            0.0,
+            1.0,
+            "Overall Correctness",
+            "oot_accuracy",
+            "test_accuracy",
+        ),
         ("f1_score", "F1-Score", 0.0, 1.0, "Precision-Recall Balance", None, None),
     ]
 
@@ -208,7 +229,7 @@ def plot_performance_metrics_over_time(df, output_dir, training_baselines=None):
             # Add value labels
             for _, row in model_df.iterrows():
                 ax.annotate(
-                    f'{row[metric]:.3f}',
+                    f"{row[metric]:.3f}",
                     (row["snapshot_date"], row[metric]),
                     textcoords="offset points",
                     xytext=(0, 10),
@@ -226,23 +247,25 @@ def plot_performance_metrics_over_time(df, output_dir, training_baselines=None):
                     oot_value = baselines[oot_key]
                     ax.axhline(
                         y=oot_value,
-                        color='darkred',
-                        linestyle='--',
+                        color="darkred",
+                        linestyle="--",
                         linewidth=1.5,
                         alpha=0.6,
-                        label=f'{model_id} OOT Baseline ({oot_value:.3f})' if idx == 0 else None,
+                        label=f"{model_id} OOT Baseline ({oot_value:.3f})"
+                        if idx == 0
+                        else None,
                         zorder=5,
                     )
                     # Add annotation for OOT baseline
                     ax.text(
                         0.98,
                         oot_value,
-                        f'OOT: {oot_value:.3f}',
+                        f"OOT: {oot_value:.3f}",
                         transform=ax.get_yaxis_transform(),
-                        ha='right',
-                        va='bottom',
+                        ha="right",
+                        va="bottom",
                         fontsize=8,
-                        color='darkred',
+                        color="darkred",
                         alpha=0.7,
                     )
 
@@ -251,11 +274,13 @@ def plot_performance_metrics_over_time(df, output_dir, training_baselines=None):
                     test_value = baselines[test_key]
                     ax.axhline(
                         y=test_value,
-                        color='orange',
-                        linestyle=':',
+                        color="orange",
+                        linestyle=":",
                         linewidth=1.2,
                         alpha=0.5,
-                        label=f'{model_id} Test Baseline ({test_value:.3f})' if idx == 0 else None,
+                        label=f"{model_id} Test Baseline ({test_value:.3f})"
+                        if idx == 0
+                        else None,
                         zorder=4,
                     )
 
@@ -298,9 +323,9 @@ def plot_performance_metrics_over_time(df, output_dir, training_baselines=None):
 
 def plot_confusion_matrix_comparison(df, output_dir):
     """Plot confusion matrices for all models and time points."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Generating Confusion Matrix Comparison")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # Get unique combinations of model and snapshot date
     unique_combos = df[["model_id", "model_type", "snapshot_date"]].drop_duplicates()
@@ -407,9 +432,9 @@ def plot_confusion_matrix_comparison(df, output_dir):
 
 def plot_prediction_distribution_stability(df, output_dir):
     """Plot prediction probability distribution statistics over time."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Generating Prediction Distribution Stability")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
 
@@ -524,9 +549,9 @@ def plot_prediction_distribution_stability(df, output_dir):
 
 def plot_model_comparison_summary(df, output_dir):
     """Create a comprehensive model comparison dashboard."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Generating Model Comparison Summary")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # Use the latest snapshot for comparison
     latest_snapshot = df["snapshot_date"].max()
@@ -586,8 +611,18 @@ def plot_model_comparison_summary(df, output_dir):
 
     # 2. Confusion matrix metrics (grouped bar)
     ax = axes[0, 1]
-    cm_metrics = ["true_positives", "true_negatives", "false_positives", "false_negatives"]
-    cm_labels = ["True\nPositives", "True\nNegatives", "False\nPositives", "False\nNegatives"]
+    cm_metrics = [
+        "true_positives",
+        "true_negatives",
+        "false_positives",
+        "false_negatives",
+    ]
+    cm_labels = [
+        "True\nPositives",
+        "True\nNegatives",
+        "False\nPositives",
+        "False\nNegatives",
+    ]
 
     x = np.arange(len(cm_metrics))
 
@@ -623,7 +658,11 @@ def plot_model_comparison_summary(df, output_dir):
 
     # 3. Prediction statistics comparison
     ax = axes[1, 0]
-    pred_stats = ["mean_prediction_proba", "median_prediction_proba", "std_prediction_proba"]
+    pred_stats = [
+        "mean_prediction_proba",
+        "median_prediction_proba",
+        "std_prediction_proba",
+    ]
     pred_labels = ["Mean", "Median", "Std Dev"]
 
     x = np.arange(len(pred_stats))
@@ -682,12 +721,18 @@ def plot_model_comparison_summary(df, output_dir):
         colLabels=["Model ID", "Type", "ROC-AUC", "Accuracy", "F1", "Samples"],
         cellLoc="center",
         loc="center",
-        bbox=[0.1, 0.2, 0.8, 0.6],
+        bbox=[0.0, 0.2, 1.0, 0.6],  # Make table wider (full width)
     )
 
     table.auto_set_font_size(False)
-    table.set_fontsize(10)
-    table.scale(1, 2)
+    table.set_fontsize(9)  # Slightly smaller font
+    table.scale(1, 2.2)  # Increase height slightly
+
+    # Set column widths to better accommodate text
+    col_widths = [0.22, 0.22, 0.14, 0.14, 0.14, 0.14]  # Model ID and Type get more space
+    for i, width in enumerate(col_widths):
+        for j in range(len(summary_data) + 1):  # +1 for header
+            table[(j, i)].set_width(width)
 
     # Highlight header
     for i in range(6):
@@ -716,8 +761,7 @@ def plot_model_comparison_summary(df, output_dir):
     best_roc_auc = df_latest["roc_auc"].max()
 
     recommendation = (
-        f"Recommended Model: {best_model_id}\n"
-        f"(Highest ROC-AUC: {best_roc_auc:.4f})"
+        f"Recommended Model: {best_model_id}\n(Highest ROC-AUC: {best_roc_auc:.4f})"
     )
 
     ax.text(
@@ -748,9 +792,9 @@ def plot_model_comparison_summary(df, output_dir):
 
 def generate_summary_report(df, output_dir):
     """Generate a text summary report of monitoring metrics."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Generating Summary Report")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     report_lines = []
     report_lines.append("=" * 80)
@@ -761,15 +805,21 @@ def generate_summary_report(df, output_dir):
     report_lines.append("")
 
     # Overall statistics
-    report_lines.append(f"Monitoring Period: {df['snapshot_date'].min().strftime('%Y-%m-%d')} to {df['snapshot_date'].max().strftime('%Y-%m-%d')}")
+    report_lines.append(
+        f"Monitoring Period: {df['snapshot_date'].min().strftime('%Y-%m-%d')} to {df['snapshot_date'].max().strftime('%Y-%m-%d')}"
+    )
     report_lines.append(f"Number of Time Points: {df['snapshot_date'].nunique()}")
-    report_lines.append(f"Models Monitored: {', '.join(sorted(df['model_id'].unique()))}")
+    report_lines.append(
+        f"Models Monitored: {', '.join(sorted(df['model_id'].unique()))}"
+    )
     report_lines.append("")
 
     # Latest snapshot metrics
     latest_snapshot = df["snapshot_date"].max()
     report_lines.append("=" * 80)
-    report_lines.append(f"LATEST PERFORMANCE (Snapshot: {latest_snapshot.strftime('%Y-%m-%d')})")
+    report_lines.append(
+        f"LATEST PERFORMANCE (Snapshot: {latest_snapshot.strftime('%Y-%m-%d')})"
+    )
     report_lines.append("=" * 80)
     report_lines.append("")
 
@@ -778,27 +828,51 @@ def generate_summary_report(df, output_dir):
     for _, row in df_latest.iterrows():
         report_lines.append(f"{row['model_id'].upper()} - {row['model_type']}")
         report_lines.append("-" * 80)
-        report_lines.append(f"  Primary Metric (ROC-AUC):      {row['roc_auc']:.4f}  {'⭐ Best' if row['roc_auc'] == df_latest['roc_auc'].max() else ''}")
+        report_lines.append(
+            f"  Primary Metric (ROC-AUC):      {row['roc_auc']:.4f}  {'⭐ Best' if row['roc_auc'] == df_latest['roc_auc'].max() else ''}"
+        )
         report_lines.append(f"  Accuracy:                      {row['accuracy']:.4f}")
         report_lines.append(f"  F1-Score:                      {row['f1_score']:.4f}")
         report_lines.append(f"  Precision:                     {row['precision']:.4f}")
         report_lines.append(f"  Recall:                        {row['recall']:.4f}")
         report_lines.append("")
-        report_lines.append(f"  Total Samples:                 {int(row['total_samples'])}")
-        report_lines.append(f"  Actual Positives (Defaults):   {int(row['actual_positives'])} ({100 * row['actual_positives'] / row['total_samples']:.1f}%)")
-        report_lines.append(f"  Predicted Positives:           {int(row['predicted_positives'])} ({100 * row['predicted_positives'] / row['total_samples']:.1f}%)")
+        report_lines.append(
+            f"  Total Samples:                 {int(row['total_samples'])}"
+        )
+        report_lines.append(
+            f"  Actual Positives (Defaults):   {int(row['actual_positives'])} ({100 * row['actual_positives'] / row['total_samples']:.1f}%)"
+        )
+        report_lines.append(
+            f"  Predicted Positives:           {int(row['predicted_positives'])} ({100 * row['predicted_positives'] / row['total_samples']:.1f}%)"
+        )
         report_lines.append("")
-        report_lines.append(f"  Confusion Matrix:")
-        report_lines.append(f"    True Positives:              {int(row['true_positives'])}")
-        report_lines.append(f"    True Negatives:              {int(row['true_negatives'])}")
-        report_lines.append(f"    False Positives:             {int(row['false_positives'])}")
-        report_lines.append(f"    False Negatives:             {int(row['false_negatives'])}")
+        report_lines.append("  Confusion Matrix:")
+        report_lines.append(
+            f"    True Positives:              {int(row['true_positives'])}"
+        )
+        report_lines.append(
+            f"    True Negatives:              {int(row['true_negatives'])}"
+        )
+        report_lines.append(
+            f"    False Positives:             {int(row['false_positives'])}"
+        )
+        report_lines.append(
+            f"    False Negatives:             {int(row['false_negatives'])}"
+        )
         report_lines.append("")
-        report_lines.append(f"  Prediction Distribution:")
-        report_lines.append(f"    Mean Probability:            {row['mean_prediction_proba']:.4f}")
-        report_lines.append(f"    Median Probability:          {row['median_prediction_proba']:.4f}")
-        report_lines.append(f"    Std Dev:                     {row['std_prediction_proba']:.4f}")
-        report_lines.append(f"    Range: [{row['min_prediction_proba']:.4f}, {row['max_prediction_proba']:.4f}]")
+        report_lines.append("  Prediction Distribution:")
+        report_lines.append(
+            f"    Mean Probability:            {row['mean_prediction_proba']:.4f}"
+        )
+        report_lines.append(
+            f"    Median Probability:          {row['median_prediction_proba']:.4f}"
+        )
+        report_lines.append(
+            f"    Std Dev:                     {row['std_prediction_proba']:.4f}"
+        )
+        report_lines.append(
+            f"    Range: [{row['min_prediction_proba']:.4f}, {row['max_prediction_proba']:.4f}]"
+        )
         report_lines.append("")
 
     # Trend analysis (if multiple time points)
@@ -815,17 +889,21 @@ def generate_summary_report(df, output_dir):
             report_lines.append("-" * 80)
 
             # Calculate trends
-            roc_auc_change = (
-                model_df["roc_auc"].iloc[-1] - model_df["roc_auc"].iloc[0]
-            )
+            roc_auc_change = model_df["roc_auc"].iloc[-1] - model_df["roc_auc"].iloc[0]
             accuracy_change = (
                 model_df["accuracy"].iloc[-1] - model_df["accuracy"].iloc[0]
             )
             f1_change = model_df["f1_score"].iloc[-1] - model_df["f1_score"].iloc[0]
 
-            report_lines.append(f"  ROC-AUC Change:     {roc_auc_change:+.4f}  {'📈 Improving' if roc_auc_change > 0 else '📉 Degrading' if roc_auc_change < 0 else '➡️ Stable'}")
-            report_lines.append(f"  Accuracy Change:    {accuracy_change:+.4f}  {'📈 Improving' if accuracy_change > 0 else '📉 Degrading' if accuracy_change < 0 else '➡️ Stable'}")
-            report_lines.append(f"  F1-Score Change:    {f1_change:+.4f}  {'📈 Improving' if f1_change > 0 else '📉 Degrading' if f1_change < 0 else '➡️ Stable'}")
+            report_lines.append(
+                f"  ROC-AUC Change:     {roc_auc_change:+.4f}  {'📈 Improving' if roc_auc_change > 0 else '📉 Degrading' if roc_auc_change < 0 else '➡️ Stable'}"
+            )
+            report_lines.append(
+                f"  Accuracy Change:    {accuracy_change:+.4f}  {'📈 Improving' if accuracy_change > 0 else '📉 Degrading' if accuracy_change < 0 else '➡️ Stable'}"
+            )
+            report_lines.append(
+                f"  F1-Score Change:    {f1_change:+.4f}  {'📈 Improving' if f1_change > 0 else '📉 Degrading' if f1_change < 0 else '➡️ Stable'}"
+            )
             report_lines.append("")
 
     # Recommendations
@@ -835,7 +913,9 @@ def generate_summary_report(df, output_dir):
     report_lines.append("")
 
     best_model = df_latest.loc[df_latest["roc_auc"].idxmax()]
-    report_lines.append(f"✓ Best Performing Model: {best_model['model_id']} ({best_model['model_type']})")
+    report_lines.append(
+        f"✓ Best Performing Model: {best_model['model_id']} ({best_model['model_type']})"
+    )
     report_lines.append(f"  ROC-AUC: {best_model['roc_auc']:.4f}")
     report_lines.append("")
 
@@ -869,9 +949,7 @@ def generate_summary_report(df, output_dir):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Visualize model monitoring metrics"
-    )
+    parser = argparse.ArgumentParser(description="Visualize model monitoring metrics")
     parser.add_argument(
         "--monitoring-dir",
         type=str,
@@ -896,11 +974,11 @@ def main():
         monitoring_dir = find_monitoring_dir()
 
     if not monitoring_dir or not os.path.isdir(monitoring_dir):
-        print(f"\n❌ Error: Monitoring directory not found")
+        print("\n❌ Error: Monitoring directory not found")
         if monitoring_dir:
             print(f"   Searched: {monitoring_dir}")
         else:
-            print(f"   Searched locations:")
+            print("   Searched locations:")
             for root in get_datamart_roots():
                 print(f"     - {os.path.join(root, 'gold/monitoring')}")
         return
@@ -929,12 +1007,14 @@ def main():
                 print(f"\n⚠️  Warning: Could not load training baselines: {e}")
                 print("   Continuing without baseline reference lines...")
         else:
-            print(f"\n⚠️  Model store not found. Visualizations will not include training baseline references.")
+            print(
+                "\n⚠️  Model store not found. Visualizations will not include training baseline references."
+            )
 
         # Generate visualizations
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("Generating Visualizations")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         plot_performance_metrics_over_time(df, output_dir, training_baselines)
         plot_confusion_matrix_comparison(df, output_dir)
@@ -942,9 +1022,9 @@ def main():
         plot_model_comparison_summary(df, output_dir)
         generate_summary_report(df, output_dir)
 
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("✅ Visualization Generation Completed Successfully")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(f"\nOutput directory: {output_dir}")
         print("\nGenerated files:")
         print("  1. performance_metrics_over_time.png")
@@ -952,7 +1032,7 @@ def main():
         print("  3. prediction_distribution_stability.png")
         print("  4. model_comparison_summary.png")
         print("  5. monitoring_summary_report.txt")
-        print(f"\n{'='*60}\n")
+        print(f"\n{'=' * 60}\n")
 
     except Exception as e:
         print(f"\n❌ Error during visualization generation: {str(e)}")

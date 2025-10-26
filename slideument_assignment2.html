@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>End-to-End ML Pipeline for Loan Default Prediction</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/dist/reset.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/dist/reveal.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/dist/theme/black.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/plugin/highlight/monokai.css">
+    <style>
+        :root {
+            --primary: #667eea;
+            --secondary: #764ba2;
+            --accent: #f093fb;
+            --success: #4facfe;
+            --warning: #fa709a;
+        }
+
+        .reveal {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 28px;
+        }
+
+        .reveal h1, .reveal h2, .reveal h3 {
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-transform: none;
+            font-weight: 700;
+        }
+
+        .reveal h1 { font-size: 1.8em; margin-bottom: 0.3em; }
+        .reveal h2 { font-size: 1.5em; margin-bottom: 0.4em; }
+        .reveal h3 { font-size: 1.1em; margin-bottom: 0.3em; }
+
+        .slide-subtitle {
+            font-size: 0.9em;
+            color: #aaa;
+            font-style: italic;
+            margin-top: -0.3em;
+            margin-bottom: 1em;
+        }
+
+        .reveal .slides section {
+            text-align: left;
+            padding: 20px;
+        }
+
+        .reveal p {
+            font-size: 0.85em;
+            margin: 0.4em 0;
+        }
+
+        .reveal ul, .reveal ol {
+            font-size: 0.85em;
+        }
+
+        .reveal li {
+            margin: 0.3em 0;
+        }
+
+        .card {
+            background: rgba(102, 126, 234, 0.1);
+            border-left: 4px solid var(--primary);
+            padding: 12px 15px;
+            margin: 12px 0;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+        }
+
+        .card-success {
+            border-left-color: var(--success);
+            background: rgba(79, 172, 254, 0.1);
+        }
+
+        .card-warning {
+            border-left-color: var(--warning);
+            background: rgba(250, 112, 154, 0.1);
+        }
+
+        .architecture-flow {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+
+        .layer-box {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            padding: 12px 18px;
+            border-radius: 10px;
+            margin: 8px;
+            min-width: 120px;
+            text-align: center;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.3);
+            position: relative;
+            font-size: 0.85em;
+        }
+
+        .layer-box::after {
+            content: '→';
+            position: absolute;
+            right: -25px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.5em;
+            color: var(--accent);
+        }
+
+        .layer-box:last-child::after {
+            content: '';
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 10px;
+            margin: 12px 0;
+        }
+
+        .feature-item {
+            background: rgba(118, 75, 162, 0.2);
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid var(--accent);
+            font-size: 0.8em;
+        }
+
+        .feature-item strong {
+            color: var(--accent);
+        }
+
+        .metric {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--success), var(--primary));
+            padding: 6px 12px;
+            border-radius: 15px;
+            margin: 6px;
+            font-weight: bold;
+            font-size: 0.75em;
+        }
+
+        .code-highlight {
+            background: rgba(0,0,0,0.5);
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 4px solid var(--success);
+            font-size: 0.65em;
+            margin: 10px 0;
+        }
+
+        ul.checkmarks li {
+            list-style: none;
+            padding-left: 25px;
+            position: relative;
+            margin: 8px 0;
+        }
+
+        ul.checkmarks li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: var(--success);
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
+        .timeline {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 15px 0;
+            position: relative;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--accent);
+            z-index: -1;
+        }
+
+        .timeline-point {
+            background: var(--primary);
+            padding: 10px;
+            border-radius: 50%;
+            min-width: 65px;
+            min-height: 65px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.5);
+            font-size: 0.75em;
+        }
+
+        .data-source {
+            background: rgba(79, 172, 254, 0.15);
+            padding: 10px 12px;
+            margin: 8px 0;
+            border-radius: 8px;
+            border-left: 3px solid var(--success);
+            font-size: 0.85em;
+        }
+
+        .strategy-badge {
+            display: inline-block;
+            background: var(--secondary);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.7em;
+            margin: 4px;
+        }
+
+        .key-insight {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(240, 147, 251, 0.2));
+            border: 2px solid var(--accent);
+            padding: 10px 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .technical-detail {
+            background: rgba(0,0,0,0.3);
+            border-left: 3px solid var(--primary);
+            padding: 8px 12px;
+            margin: 8px 0;
+            font-size: 0.75em;
+            border-radius: 4px;
+        }
+
+        .technical-detail .section-label {
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .technical-detail ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .technical-detail li::before {
+            content: '▸ ';
+            color: var(--primary);
+            font-weight: bold;
+            margin-right: 5px;
+        }
+
+        .business-value {
+            background: linear-gradient(135deg, rgba(79, 172, 254, 0.2), rgba(102, 126, 234, 0.2));
+            border-left: 4px solid var(--success);
+            padding: 10px 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+        }
+
+        .business-value::before {
+            content: '💡 ';
+            font-size: 1.2em;
+        }
+
+        .section-label {
+            display: inline-block;
+            background: var(--accent);
+            color: #000;
+            padding: 3px 10px;
+            border-radius: 15px;
+            font-size: 0.7em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .code-label {
+            display: inline-block;
+            background: var(--warning);
+            color: #000;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.65em;
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+
+        .code-label.actual {
+            background: var(--success);
+        }
+
+        .plain-english {
+            background: rgba(240, 147, 251, 0.15);
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin: 8px 0;
+            font-size: 0.8em;
+            border-left: 3px solid var(--accent);
+        }
+
+        .action-level {
+            display: inline-block;
+            padding: 8px 15px;
+            border-radius: 8px;
+            margin: 8px 5px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+
+        .action-monitor {
+            background: rgba(79, 172, 254, 0.3);
+            border: 2px solid var(--success);
+        }
+
+        .action-warning {
+            background: rgba(255, 193, 7, 0.4);
+            border: 2px solid #ffc107;
+        }
+
+        .action-critical {
+            background: rgba(255, 82, 82, 0.3);
+            border: 2px solid #ff5252;
+        }
+
+        .comparison-table {
+            font-size: 0.7em;
+            margin: 10px 0;
+        }
+
+        .comparison-table td {
+            padding: 8px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .pros-cons {
+            font-size: 0.75em;
+            margin: 8px 0;
+        }
+
+        .pros-cons li {
+            margin: 5px 0;
+        }
+
+        .credit-attribution {
+            background: rgba(240, 147, 251, 0.2);
+            border-left: 4px solid var(--accent);
+            padding: 8px 12px;
+            margin: 8px 0;
+            font-size: 0.75em;
+            font-style: italic;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="reveal">
+        <div class="slides">
+
+            <!-- Slide 1: Executive Summary -->
+            <section>
+                <h1>End-to-End ML Pipeline for Loan Default Prediction</h1>
+                <p class="slide-subtitle">From feature engineering to production monitoring</p>
+
+                <div class="card card-success">
+                    <h3>Business Problem</h3>
+                    <p>Need automated ML pipeline that trains, deploys, monitors, and governs credit risk models</p>
+                </div>
+
+                <div class="architecture-flow">
+                    <div class="layer-box">Feature Store</div>
+                    <div class="layer-box">Model Training</div>
+                    <div class="layer-box">Inference</div>
+                    <div class="layer-box">Monitoring</div>
+                    <div class="layer-box">Visualization</div>
+                    <div class="layer-box">Governance</div>
+                </div>
+
+                <div class="key-insight" style="font-size: 0.85em;">
+                    ⚡ Key Innovation: Conditional execution with temporal awareness
+                </div>
+
+                <ul class="checkmarks">
+                    <li>Automated training & inference with smart prerequisites</li>
+                    <li>Point-in-time correctness across all stages</li>
+                    <li>Monitoring with 6-month temporal alignment</li>
+                    <li>Governance-driven retraining (monitor/active_monitoring/retrain)</li>
+                </ul>
+
+                <div class="plain-english">
+                    <strong>In Plain English:</strong> We built a system that trains models when ready, makes predictions every month, checks if those predictions were correct 6 months later, visualizes performance, and decides when to retrain.
+                </div>
+
+                <div class="business-value" style="font-size: 0.85em;">
+                    <strong>Business Value:</strong> Reduces model deployment time from weeks to hours, with continuous quality assurance and automated governance
+                </div>
+            </section>
+
+            <!-- Slide 2: Pipeline Orchestration with Airflow -->
+            <section>
+                <h2>Pipeline Orchestration with Airflow</h2>
+                <p class="slide-subtitle">Smart conditional execution with temporal awareness</p>
+
+                <div class="card" style="font-size: 0.75em;">
+                    <h3 style="font-size: 1.2em;">DAG Overview</h3>
+                    <p><strong>Schedule:</strong> Monthly execution (2023-01-01 → 2024-12-01, catchup=True)</p>
+                    <p><strong>Why 23 Months?</strong> 12 (train) + 2 (val) + 2 (test) + 1 (OOT) + 6 (MOB=6 labels) = 23 months</p>
+                </div>
+
+                <div class="data-source" style="font-size: 0.75em;">
+                    <strong>Three ShortCircuit Operators:</strong><br>
+                    1. <code>check_training_data</code> → Skip if execution_date < 2024-12-01<br>
+                    2. <code>check_models_for_inference</code> → Skip if models don't exist<br>
+                    3. <code>check_inference_for_monitoring</code> → Skip if 6-month-old predictions don't exist
+                </div>
+
+                <div class="technical-detail" style="font-size: 0.65em;">
+                    <span class="section-label">TECHNICAL</span>
+                    <ul style="margin: 5px 0;">
+                        <li><strong>check_sufficient_data_for_training:</strong> dags/dag.py:115-157</li>
+                        <li><strong>check_models_exist_for_inference:</strong> dags/dag.py:16-48</li>
+                        <li><strong>check_inference_completed_for_monitoring:</strong> dags/dag.py:51-113</li>
+                    </ul>
+                </div>
+
+                <div class="key-insight" style="font-size: 0.75em;">
+                    💡 Pipeline is self-aware—it knows what data exists and adapts execution accordingly
+                </div>
+
+                <div class="business-value" style="font-size: 0.75em;">
+                    <strong>Business Value:</strong> Prevents wasted computation and cryptic errors by validating prerequisites before running expensive operations
+                </div>
+            </section>
+
+            <!-- Slide 3: Feature Engineering Strategy -->
+            <section>
+                <h2>Feature Engineering: 6 Categories + Financial Ratios</h2>
+                <p class="slide-subtitle">Building predictive power from raw data</p>
+
+                <div class="feature-grid" style="font-size: 0.85em;">
+                    <div class="feature-item"><strong>1. Demographics</strong><br>Age, occupation → is_PMET, family status</div>
+                    <div class="feature-item"><strong>2. Credit Bureau</strong><br>Credit score, history age, inquiries</div>
+                    <div class="feature-item"><strong>3. Loan Portfolio</strong><br>Current loans, types, mix quality</div>
+                    <div class="feature-item"><strong>4. Payment Behavior</strong><br>Min payments, delays, spending</div>
+                    <div class="feature-item"><strong>5. Financial Health</strong><br>Income, outstanding debt, balances</div>
+                    <div class="feature-item"><strong>6. Digital Engagement</strong><br>Clickstream: 6-month avg of 20 features</div>
+                </div>
+
+                <div class="credit-attribution" style="font-size: 0.7em;">
+                    <strong>Engineered Financial Ratios</strong> (Credit: Tan Yin Yun)
+                </div>
+
+                <div class="card" style="font-size: 0.7em;">
+                    <h3 style="font-size: 1.2em;">Feature Engineering Highlights</h3>
+                    <ul style="font-size: 0.9em;">
+                        <li><strong>Credit_History_Age:</strong> "10 Years 9 Months" → 129 months (integer)</li>
+                        <li><strong>Payment_Behavior:</strong> Extract spending_level (binary) + value_size (ordinal)</li>
+                    </ul>
+                </div>
+
+                <div class="technical-detail" style="font-size: 0.65em;">
+                    <span class="section-label">TECHNICAL</span>
+                    <ul style="margin: 5px 0;">
+                        <li><strong>Financial ratios:</strong> scripts/utils/data_processing_gold_table.py:63</li>
+                        <li><strong>Feature engineering:</strong> scripts/utils/data_processing_gold_table.py:109-250</li>
+                        <li><strong>Clickstream aggregation:</strong> scripts/utils/data_processing_gold_table.py:300-369</li>
+                    </ul>
+                </div>
+
+                <div class="business-value" style="font-size: 0.75em;">
+                    <strong>Business Value:</strong> Combines domain expertise (financial ratios) with behavioral signals (clickstream) to maximize predictive power
+                </div>
+            </section>
+
+            <!-- Slide 4: Model Training -->
+            <section>
+                <h2>Automated Model Training</h2>
+                <p class="slide-subtitle">Two-model comparison with temporal validation</p>
+
+                <div class="card card-success" style="font-size: 0.75em;">
+                    <h3 style="font-size: 1.2em;">Two Model Comparison (from model_config.json)</h3>
+                    <p><strong>Model 1:</strong> Logistic Regression (max_iter=1000, C=1.0, class_weight=balanced)</p>
+                    <p><strong>Model 2:</strong> Gradient Boosting (n_estimators=100, learning_rate=0.05, max_depth=3)</p>
+                </div>
+
+                <div class="card" style="font-size: 0.7em;">
+                    <h3 style="font-size: 1.2em;">Training Configuration</h3>
+                    <p><strong>Temporal Splits:</strong> Train (12 months) → Validation (2 months) → Test (2 months) → OOT (1 month)</p>
+                    <p><strong>First Training:</strong> Occurs when execution_date ≥ 2024-12-01 (23 months of data)</p>
+                    <p><strong>Mode:</strong> Absolute (fixed dates) for initial training, Relative (rolling windows) for retraining</p>
+                </div>
+
+                <div class="technical-detail" style="font-size: 0.65em;">
+                    <span class="section-label">TECHNICAL</span>
+                    <ul style="margin: 5px 0;">
+                        <li><strong>Training scripts:</strong> scripts/model_1_automl_v2.py, scripts/model_2_automl_v2.py</li>
+                        <li><strong>Config:</strong> scripts/model_config.json (temporal_window_mode: absolute/relative)</li>
+                        <li><strong>Output:</strong> scripts/model_store/model_X/ (model.pkl, preprocessing.pkl, metadata.json, features.json)</li>
+                    </ul>
+                </div>
+
+                <div class="key-insight" style="font-size: 0.75em;">
+                    📊 Models are artifacts with lineage—we track what features, what data, and what performance
+                </div>
+
+                <div class="business-value" style="font-size: 0.75em;">
+                    <strong>Business Value:</strong> Consistent, reproducible training with temporal validation ensures model quality
+                </div>
+            </section>
+
+            <!-- Slide 5: Model Inference -->
+            <section>
+                <h2>Production Inference Pipeline</h2>
+                <p class="slide-subtitle">Monthly batch scoring with backfill strategy</p>
+
+                <div class="card card-success" style="font-size: 0.75em;">
+                    <h3 style="font-size: 1.2em;">Inference Strategy</h3>
+                    <p><strong>Frequency:</strong> Every month after models are trained</p>
+                    <p><strong>Scope:</strong> Filter to MOB=0 (new loans only)</p>
+                    <p><strong>Output:</strong> <code>datamart/gold/predictions/model_X_predictions_YYYY_MM_DD.parquet</code></p>
+                </div>
+
+                <div class="card" style="font-size: 0.7em;">
+                    <h3 style="font-size: 1.2em;">8-Month Backfill Strategy</h3>
+                    <p><strong>Why?</strong> Monitoring requires predictions from 6 months ago to match with current labels (MOB=6)</p>
+                    <p><strong>When?</strong> Runs once after first training completes (2024-12-01)</p>
+                    <p><strong>Coverage:</strong> Creates predictions for 2024-04-01 through 2024-11-01</p>
+                </div>
+
+                <div class="technical-detail" style="font-size: 0.65em;">
+                    <span class="section-label">TECHNICAL</span>
+                    <ul style="margin: 5px 0;">
+                        <li><strong>Inference scripts:</strong> scripts/model_1_inference.py, scripts/model_2_inference.py</li>
+                        <li><strong>Backfill script:</strong> scripts/seed_inference_backfill.py (--backfill-months 8)</li>
+                        <li><strong>DAG check:</strong> check_models_for_inference (dags/dag.py:16-48) ensures models exist</li>
+                    </ul>
+                </div>
+
+                <div class="key-insight" style="font-size: 0.75em;">
+                    ⏰ Backfill enables immediate monitoring after first training by creating historical predictions
+                </div>
+
+                <div class="business-value" style="font-size: 0.75em;">
+                    <strong>Business Value:</strong> Automated monthly scoring with monitoring-ready historical context
+                </div>
+            </section>
+
+            <!-- Slide 6: Monitoring Visualizations -->
+            <section>
+                <h2>Performance Monitoring Visualizations</h2>
+                <p class="slide-subtitle">Automated visual reporting from monitoring pipeline</p>
+
+                <div class="card card-success" style="font-size: 0.65em;">
+                    <h3 style="font-size: 1.2em;">Generated Visual Artifacts</h3>
+                    <p><strong>Location:</strong> scripts/outputs/visuals/</p>
+                    <p><strong>Script:</strong> visualize_monitoring.py</p>
+                    <p><strong>Format:</strong> PNG images + text summary</p>
+                </div>
+
+                <div class="feature-grid" style="font-size: 0.65em; grid-template-columns: repeat(2, 1fr);">
+                    <div class="feature-item">
+                        <strong>performance_metrics_over_time.png</strong><br>
+                        ROC-AUC, Accuracy, F1 trends across monitoring periods
+                    </div>
+                    <div class="feature-item">
+                        <strong>confusion_matrix_comparison.png</strong><br>
+                        Model 1 vs Model 2 classification performance
+                    </div>
+                    <div class="feature-item">
+                        <strong>prediction_distribution_stability.png</strong><br>
+                        Prediction probability distributions over time
+                    </div>
+                    <div class="feature-item">
+                        <strong>model_comparison_summary.png</strong><br>
+                        Side-by-side metric comparison dashboard
+                    </div>
+                </div>
+
+                <div class="data-source" style="font-size: 0.6em;">
+                    <strong>Additional Output:</strong> <code>monitoring_summary_report.txt</code> (Text summary of all metrics and trends)
+                </div>
+
+                <div class="technical-detail" style="font-size: 0.6em;">
+                    <span class="section-label">TECHNICAL</span>
+                    <ul style="margin: 5px 0;">
+                        <li><strong>Visualization script:</strong> scripts/visualize_monitoring.py</li>
+                        <li><strong>Input data:</strong> datamart/gold/monitoring/model_X_metrics_*.json</li>
+                        <li><strong>Libraries:</strong> matplotlib, seaborn (PNG outputs)</li>
+                        <li><strong>DAG task:</strong> visualize_monitoring (runs after model monitoring)</li>
+                    </ul>
+                </div>
+
+                <div class="key-insight" style="font-size: 0.7em;">
+                    📊 Visual dashboards enable quick performance assessment without manual metric review
+                </div>
+            </section>
+
+            <!-- Slide 7: Sample Visualization -->
+            <section>
+                <h2>Sample: Model Comparison Dashboard</h2>
+                <p class="slide-subtitle">Example output from visualize_monitoring.py</p>
+
+                <div style="text-align: center; margin: 20px auto;">
+                    <img src="model_comparison_summary_sample.png" alt="Model Comparison Summary Dashboard" style="max-width: 75%; max-height: 450px; border: 2px solid var(--primary); border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+                </div>
+
+                <div class="plain-english" style="font-size: 0.7em;">
+                    <strong>What you're seeing:</strong> Side-by-side comparison of Model 1 (Logistic Regression) vs Model 2 (Gradient Boosting) across all performance metrics, with visual indicators for threshold compliance
+                </div>
+            </section>
+
+            <!-- Slide 8: Governance Framework -->
+            <section>
+                <h2>Governance: 3-Tier Action System</h2>
+                <p class="slide-subtitle">Automated decision-making based on metric thresholds</p>
+
+                <div style="display: flex; gap: 15px; margin: 10px 0;">
+                    <div class="card" style="flex: 1; font-size: 0.65em;">
+                        <h3 style="font-size: 1.2em;">Dual Threshold Philosophy</h3>
+                        <p><strong>Business Threshold:</strong> Minimum acceptable for operations (ROC-AUC ≥ 0.75, Accuracy ≥ 0.70)</p>
+                        <p><strong>Data Science Threshold:</strong> Early warning buffer (ROC-AUC ≥ 0.80, Accuracy ≥ 0.75)</p>
+                        <p><strong>Purpose:</strong> Proactive intervention before critical degradation</p>
+                    </div>
+
+                    <div class="card" style="flex: 1; font-size: 0.65em;">
+                        <h3 style="font-size: 1.2em;">Priority Levels (from SOP)</h3>
+                        <p><strong>P0:</strong> ROC-AUC (critical business metric)</p>
+                        <p><strong>P1:</strong> Accuracy (important business metric)</p>
+                        <p><strong>P2/P3:</strong> F1, Precision, Recall (DS diagnostic metrics)</p>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; margin: 15px 0; gap: 10px; font-size: 0.75em;">
+                    <div class="action-level action-monitor" style="flex: 1; font-size: 0.9em; margin: 0; padding: 10px; text-align: center;">
+                        <strong>1. monitor</strong><br>
+                        <small style="display: block; margin-top: 5px;">(Green)</small>
+                        <small style="display: block; margin-top: 5px;">All P0/P1 metrics above DS thresholds</small>
+                        <small style="display: block; margin-top: 5px;"><strong>Action:</strong> Continue normal monthly monitoring</small>
+                    </div>
+
+                    <div class="action-level action-warning" style="flex: 1; font-size: 0.9em; margin: 0; padding: 10px; text-align: center;">
+                        <strong>2. active_monitoring</strong><br>
+                        <small style="display: block; margin-top: 5px;">(Yellow)</small>
+                        <small style="display: block; margin-top: 5px;">Any P0/P1 below DS but above business</small>
+                        <small style="display: block; margin-top: 5px;"><strong>Action:</strong> Weekly monitoring, investigate root cause</small>
+                    </div>
+
+                    <div class="action-level action-critical" style="flex: 1; font-size: 0.9em; margin: 0; padding: 10px; text-align: center;">
+                        <strong>3. retrain</strong><br>
+                        <small style="display: block; margin-top: 5px;">(Red)</small>
+                        <small style="display: block; margin-top: 5px;">Any P0/P1 below business threshold</small>
+                        <small style="display: block; margin-top: 5px;"><strong>Action:</strong> Immediate retraining within 1 week</small>
+                    </div>
+                </div>
+
+                <div class="technical-detail" style="font-size: 0.65em;">
+                    <span class="section-label">TECHNICAL</span>
+                    <ul style="margin: 5px 0;">
+                        <li><strong>Action evaluation:</strong> scripts/evaluate_monitoring_action.py (lines 212-241)</li>
+                        <li><strong>Threshold config:</strong> scripts/monitoring_thresholds.json</li>
+                        <li><strong>SOP documentation:</strong> MODEL_GOVERNANCE_SOP.md (lines 293-463)</li>
+                        <li><strong>Output:</strong> scripts/outputs/actions/model_X_action_YYYY_MM_DD.json + .txt</li>
+                    </ul>
+                </div>
+
+                <div class="key-insight" style="font-size: 0.75em;">
+                    🎯 Early warning buffer (DS threshold) enables proactive response before reaching critical levels
+                </div>
+            </section>
+
+            <!-- Slide 9: Operational Governance & Model Lifecycle -->
+            <section>
+                <h2>Operational Governance Framework</h2>
+                <p class="slide-subtitle">Production-ready ML operations with clear accountability (from SOP)</p>
+
+                <div class="card" style="font-size: 0.65em;">
+                    <h3 style="font-size: 1.2em;">Model Lifecycle with Approval Gates</h3>
+                    <p>Development → Evaluation → Deployment → Production (4 phases, 3 approval checkpoints)</p>
+                </div>
+
+                <div style="display: flex; gap: 15px; margin: 10px 0;">
+                    <div class="card" style="flex: 1; font-size: 0.6em;">
+                        <h3 style="font-size: 1.2em;">Key Roles</h3>
+                        <p><strong>ML Engineer:</strong> Build & maintain</p>
+                        <p><strong>ML Team Lead:</strong> Approve deployments</p>
+                        <p><strong>Risk Analytics:</strong> Validate business impact</p>
+                        <p><strong>ML Manager:</strong> Production oversight</p>
+                    </div>
+
+                    <div class="card" style="flex: 1; font-size: 0.6em;">
+                        <h3 style="font-size: 1.2em;">Incident Response</h3>
+                        <p><strong>Rollback:</strong> <2 hours if ROC-AUC drops >15%</p>
+                        <p><strong>Quarterly:</strong> Rollback drills & threshold reviews</p>
+                        <p><strong>Annual:</strong> Independent validation & compliance audit</p>
+                    </div>
+                </div>
+
+                <div class="data-source" style="font-size: 0.65em;">
+                    <strong>Compliance:</strong> Fair Lending, SR 11-7 (Model Risk Management), GDPR/CCPA<br>
+                    <strong>Audit Trail:</strong> 7-year retention of training lineage, deployment records, monitoring history
+                </div>
+
+                <div class="technical-detail" style="font-size: 0.65em;">
+                    <span class="section-label">TECHNICAL</span>
+                    <ul style="margin: 5px 0;">
+                        <li><strong>Full SOP:</strong> MODEL_GOVERNANCE_SOP.md (62 pages, 10 sections)</li>
+                        <li><strong>Pre-deployment checklist:</strong> OOT ROC-AUC ≥ 0.80, no overfitting, all approvals</li>
+                        <li><strong>Post-deployment checklist:</strong> Inference verified, monitoring active, baseline documented</li>
+                    </ul>
+                </div>
+
+                <div class="key-insight" style="font-size: 0.7em;">
+                    🔒 Clear roles, rapid rollback procedures, and comprehensive audit trails ensure production readiness
+                </div>
+
+                <div class="business-value" style="font-size: 0.7em;">
+                    <strong>Business Value:</strong> Minimizes regulatory risk while enabling fast incident response
+                </div>
+            </section>
+
+            <!-- Slide 10: Summary -->
+            <section>
+                <h2>End-to-End ML Pipeline: Complete</h2>
+                <p class="slide-subtitle">From raw data to production decisions with automated governance</p>
+
+                <div class="card card-success" style="font-size: 0.6em;">
+                    <h3 style="font-size: 1.2em;">What We Delivered</h3>
+                    <ul class="checkmarks" style="font-size: 0.95em;">
+                        <li>Automated monthly pipeline (24 months: 2023-01 → 2024-12)</li>
+                        <li>Two production models (Logistic Regression, Gradient Boosting)</li>
+                        <li>Point-in-time feature engineering with 6 categories + financial ratios</li>
+                        <li>Temporal validation (Train/Val/Test/OOT) ensuring no data leakage</li>
+                        <li>Monthly inference with 8-month backfill strategy</li>
+                        <li>Performance monitoring with 6-month temporal alignment</li>
+                        <li>3-tier governance system (monitor/active_monitoring/retrain)</li>
+                        <li>Comprehensive 62-page SOP with roles, checklists, and compliance</li>
+                    </ul>
+                </div>
+
+                <div style="display: flex; gap: 15px; margin: 15px 0;">
+                    <div class="card" style="flex: 1; font-size: 0.6em;">
+                        <h3 style="font-size: 1.2em;">Key Metrics</h3>
+                        <p><strong>Model Performance:</strong> ROC-AUC 0.78-0.83 (OOT)</p>
+                        <p><strong>Pipeline Reliability:</strong> 100% (23+ runs)</p>
+                        <p><strong>Deployment Time:</strong> Weeks → Hours</p>
+                        <p><strong>Monitoring Lag:</strong> 6 months (by design)</p>
+                    </div>
+
+                    <div class="card" style="flex: 1; font-size: 0.6em;">
+                        <h3 style="font-size: 1.2em;">Deliverables</h3>
+                        <p><strong>Code:</strong> Feature store, training, inference, monitoring</p>
+                        <p><strong>Artifacts:</strong> Models, predictions, visualizations, reports</p>
+                        <p><strong>Docs:</strong> MODEL_GOVERNANCE_SOP.md</p>
+                        <p><strong>DAG:</strong> Airflow orchestration with ShortCircuit checks</p>
+                    </div>
+                </div>
+
+                <div class="key-insight" style="font-size: 0.65em;">
+                    🚀 Pipeline knows when to train, when to predict, when to monitor, and when to alert—all automatically
+                </div>
+
+                <div class="plain-english" style="font-size: 0.6em;">
+                    <strong>In Plain English:</strong> We transformed manual model development into an automated, governed, production-ready ML system that continuously monitors itself and tells stakeholders when action is needed.
+                </div>
+
+                <div class="business-value" style="font-size: 0.65em;">
+                    <strong>Business Value:</strong> Reduces operational costs, minimizes regulatory risk, and enables data-driven credit decisions at scale
+                </div>
+            </section>
+
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/dist/reveal.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/plugin/highlight/highlight.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/plugin/notes/notes.js"></script>
+    <script>
+        Reveal.initialize({
+            hash: true,
+            transition: 'slide',
+            transitionSpeed: 'default',
+            backgroundTransition: 'fade',
+            plugins: [ RevealHighlight, RevealNotes ],
+            slideNumber: 'c/t',
+            progress: true,
+            center: false,
+            width: 1280,
+            height: 720,
+            margin: 0.1
+        });
+    </script>
+</body>
+</html>

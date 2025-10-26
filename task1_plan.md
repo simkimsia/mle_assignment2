@@ -7,12 +7,14 @@
 These operators serve as **checkpoints and markers** for workflow visualization and dependency management. They don't perform actual work but help organize the DAG structure:
 
 **Why Keep Them:**
+
 - Visual clarity in Airflow UI graph view
 - Clean dependency management between pipeline stages
 - No computational cost (instant completion)
 - Industry best practice for complex DAGs
 
 **List of DummyOperators to Keep:**
+
 1. `dep_check_source_label_data` - Checkpoint before label data ingestion
 2. `label_store_completed` - End marker for label store pipeline
 3. `dep_check_source_data_bronze_1/2/3` - Checkpoints before feature bronze ingestion
@@ -29,13 +31,15 @@ These operators serve as **checkpoints and markers** for workflow visualization 
 These operators currently do nothing but **MUST** be replaced with BashOperators calling actual Python scripts to perform ML work:
 
 **Why Replace Them:**
+
 - They represent actual computational tasks (training, inference, monitoring)
 - Required for Task 1 deliverables
 - Need to produce artifacts (models, predictions, metrics)
 
 **List of DummyOperators to Replace:**
 
-#### Model Training (Section 3-4):
+#### Model Training (Section 3-4)
+
 - `model_1_automl` → Replace with BashOperator calling `model_1_automl.py`
   - **Purpose:** Train Model 1 (e.g., Logistic Regression)
   - **Input:** Gold feature store + label store
@@ -46,7 +50,8 @@ These operators currently do nothing but **MUST** be replaced with BashOperators
   - **Input:** Gold feature store + label store
   - **Output:** `model_store/model_2/` (model artifacts, metrics)
 
-#### Model Inference (Section 5):
+#### Model Inference (Section 5)
+
 - `model_1_inference` → Replace with BashOperator calling `model_1_inference.py`
   - **Purpose:** Generate predictions using Model 1
   - **Input:** Gold feature store + trained model_1
@@ -57,7 +62,8 @@ These operators currently do nothing but **MUST** be replaced with BashOperators
   - **Input:** Gold feature store + trained model_2
   - **Output:** `datamart/gold/predictions/model_2_predictions_YYYY_MM_DD.parquet`
 
-#### Model Monitoring (Section 6):
+#### Model Monitoring (Section 6)
+
 - `model_1_monitor` → Replace with BashOperator calling `model_1_monitor.py`
   - **Purpose:** Calculate performance metrics for Model 1
   - **Input:** Predictions + labels (ground truth)
@@ -124,9 +130,7 @@ These operators currently do nothing but **MUST** be replaced with BashOperators
 - **Final Assets:** Prepare to submit the Airflow DAGs, model store snapshot, gold tables, monitoring outputs, visualisations, and SOP documentation alongside a brief write-up connecting each deliverable to Task 1 requirements.
 
 ## Current state
- Todos
-  ☒ Rerun Model 1 training script locally
-  ☐ Train Model 2 (Gradient Boosting)
-  ☐ Compare Model 1 vs Model 2 performance
-  ☐ Update DAG to include model training tasks
-  ☐ Run model training in Airflow
+
+- [x] automl training is up
+- [x] inference is up
+- [x] monitoring is up

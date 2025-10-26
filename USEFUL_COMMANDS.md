@@ -215,3 +215,52 @@ df_train.groupBy('label').count().show()
 spark.stop()
 EOF
 ```
+
+## Run model inference
+
+This assumes that `scripts/model_store/` has the right artefacts based on model_id like `model_1`, etc
+
+### For inferencing model 1 and snapshotdate is 2024-12-01
+
+The actual script and the snapshotdate are variable.
+
+`docker compose exec airflow-scheduler python /opt/airflow/scripts/model_1_inference.py --snapshotdate 2024-12-01`
+
+This will output to `scripts/datamart/gold/predictions`
+
+## Run model monitoring
+
+This assumes that `scripts/model_store/` has the right artefacts based on model_id like `model_1`, etc
+and that the right predictions have been generated from model inference in `scripts/datamart/gold/predictions`
+
+### For monitoring model 1 and snapshotdate is 2024-12-01
+
+The actual script and the snapshotdate are variable.
+
+`docker compose exec airflow-scheduler python /opt/airflow/scripts/model_1_monitor.py --snapshotdate 2024-12-01`
+
+This will output to `scripts/datamart/gold/monitoring`
+
+## Run visuals - post monitoring
+
+This assumes that the monitoring metrics are generated in `scripts/datamart/gold/monitoring`
+
+Run
+
+`docker compose exec airflow-scheduler python /opt/airflow/scripts/visualize_monitoring.py `
+
+This will act on ALL the models and output to `scripts/outputs/visuals`
+
+## Run evaluate actions - post visuals
+
+This assumes that the monitoring metrics are generated in `scripts/datamart/gold/monitoring`
+
+And that the thresholds are set in `scripts/monitoring_thresholds.json`
+
+### Evaluate action - model 1
+
+`docker compose exec airflow-scheduler python /opt/airflow/scripts/evaluate_monitoring_action.py --model-id model_1`
+
+THis will evaluate the monitoring metrics against the thresholds.
+
+This will act on the selected model and output to `scripts/outputs/actions`
