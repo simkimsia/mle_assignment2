@@ -262,3 +262,8 @@ model_store/model_2
 
 # Allow .gitkeep files to track empty directories
 !**/.gitkeep
+
+.vscode
+.claude/
+.specstory/
+.cursorindexingignore
