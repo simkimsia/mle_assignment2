@@ -244,3 +244,21 @@ lab_5.zip
 
 
 sample_assignments/
+
+scripts/datamart/gold/monitoring
+scripts/datamart/gold/predictions
+scripts/datamart/gold/feature_store
+scripts/datamart/gold/label_store
+
+scripts/datamart/silver
+scripts/datamart/bronze
+scripts/datamart/quarantine
+
+outputs/actions
+outputs/visuals
+
+model_store/model_1
+model_store/model_2
+
+# Allow .gitkeep files to track empty directories
+!**/.gitkeep
