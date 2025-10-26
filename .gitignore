@@ -257,8 +257,8 @@ scripts/datamart/quarantine
 scripts/outputs/actions
 scripts/outputs/visuals
 
-model_store/model_1
-model_store/model_2
+scripts/model_store/model_1
+scripts/model_store/model_2
 
 # Allow .gitkeep files to track empty directories
 !**/.gitkeep

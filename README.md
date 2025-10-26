@@ -2,7 +2,9 @@
 
 GitHub 👨🏻‍💻: https://github.com/simkimsia/mle_assignment2
 
-Loom 🎥:
+Loom 🎥: https://www.loom.com/share/98363f721edf42208925b3461d611284
+
+Sorry about the echo! It's from the ceiling fan!
 
 An Apache Airflow-orchestrated machine learning pipeline for loan default prediction, featuring automated data processing, model training, inference, and monitoring.
 
@@ -45,6 +47,17 @@ An Apache Airflow-orchestrated machine learning pipeline for loan default predic
    - Click on the DAG name to view the graph
    - Watch tasks execute from 2023-01-01 to 2024-12-01
    - Green = Success, Red = Failed, Yellow = Running, Pink = Skipped
+
+6. **May need to rerun the inference for 2024-12-01**
+   - First time when run from scratch, the last 2024-12-01 snapshot might not be successful
+   - Wait for 2024-12-01 training to be done and check that `scripts/model_store/model_1` and `model_2` are done
+   - Then rerun `check_models_for_inference` in the Airflow > clear task > clear and retry
+
+7. **Confirm the artefacts are produced**
+   - `scripts/outputs/actions`
+   - `scripts/outputs/visuals`
+   - `scripts/datamart/gold/monitoring`
+   - `scripts/datamart/gold/predictions`
 
 ### Stop the Pipeline
 
