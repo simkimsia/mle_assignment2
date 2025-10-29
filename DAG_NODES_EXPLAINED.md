@@ -9,11 +9,19 @@ This document explains all the tasks (nodes) in the Airflow DAG and their purpos
 - **Period:** 2023-01-01 to 2024-12-01 (24 months)
 - **Catchup:** Enabled (will backfill all historical runs)
 
+![End-to-end Airflow DAG](images/end-to-end-overview.png)
+
+_Figure 1: Complete pipeline layout showing how each branch connects across the monthly run._
+
 ---
 
 ## 🏷️ Label Store Pipeline
 
 This pipeline processes loan data to create labels for ML model training.
+
+![Label and feature pipelines](images/data-pipeline.png)
+
+_Figure 2: Label store (top) and feature store (bottom) data preparation branches feeding downstream tasks._
 
 ### `dep_check_source_label_data`
 
@@ -196,6 +204,10 @@ This pipeline processes user feature data (attributes, financials, clickstream) 
 
 **Status:** ✅ Implemented
 **Purpose:** Use trained models to generate predictions
+
+![Inference and monitoring pipeline](images/inference-monitoring-pipeline.png)
+
+_Figure 3: Inference, monitoring, visualization, and action evaluation sequence once models are available._
 
 ### `check_models_for_inference`
 
@@ -442,6 +454,10 @@ Three action levels based on P0 and P1 metric performance:
 
 **Status:** ✅ Implemented
 **Purpose:** Automatically train and retrain models with temporal validation
+
+![Model AutoML pipeline](images/training.png)
+
+_Figure 4: Training branch responsible for model refresh and seeding historical predictions._
 
 ### `check_training_data`
 
