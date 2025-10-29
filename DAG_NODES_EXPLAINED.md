@@ -4,10 +4,10 @@ This document explains all the tasks (nodes) in the Airflow DAG and their purpos
 
 ## 📋 DAG Overview
 
-**DAG Name:** `dag`
-**Schedule:** Monthly (1st of each month at 00:00)
-**Period:** 2023-01-01 to 2024-12-01 (24 months)
-**Catchup:** Enabled (will backfill all historical runs)
+- **DAG Name:** `dag`
+- **Schedule:** Monthly (1st of each month at 00:00)
+- **Period:** 2023-01-01 to 2024-12-01 (24 months)
+- **Catchup:** Enabled (will backfill all historical runs)
 
 ---
 
