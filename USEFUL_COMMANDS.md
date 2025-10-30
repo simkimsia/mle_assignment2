@@ -13,6 +13,38 @@ Or go to Airflow UI, select the DAG, and click delete and confirm.
 
 ---
 
+## Bronze Layer Processing
+
+Run bronze layer scripts for a specific snapshot date. All bronze scripts accept `--snapshotdate` in YYYY-MM-DD format.
+
+### Run all bronze layer scripts for a specific date
+
+**Process features_attributes.csv:**
+```bash
+docker compose exec airflow-scheduler python /opt/airflow/scripts/bronze_table_1.py --snapshotdate 2024-07-01
+```
+Output: `scripts/datamart/bronze/features/attributes/`
+
+**Process features_financials.csv:**
+```bash
+docker compose exec airflow-scheduler python /opt/airflow/scripts/bronze_table_2.py --snapshotdate 2024-07-01
+```
+Output: `scripts/datamart/bronze/features/financials/`
+
+**Process feature_clickstream.csv:**
+```bash
+docker compose exec airflow-scheduler python /opt/airflow/scripts/bronze_table_3.py --snapshotdate 2024-07-01
+```
+Output: `scripts/datamart/bronze/features/clickstream/`
+
+**Process lms_loan_daily.csv (label store):**
+```bash
+docker compose exec airflow-scheduler python /opt/airflow/scripts/bronze_label_store.py --snapshotdate 2024-07-01
+```
+Output: `scripts/datamart/bronze/lms/`
+
+---
+
 ## Parquet File Inspection
 
 ### List Available Parquet Files by Date
